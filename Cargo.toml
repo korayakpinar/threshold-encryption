@@ -11,6 +11,12 @@ ark-ff = { version = "0.4.0" }
 ark-poly = { version = "0.4.0" }
 ark-bls12-381 = { version = "0.4.0" }
 ark-serialize = { version = "0.4.0" }
+aes = "0.7"
+block-modes = "0.8"
+block-padding = "0.2"
+sha2 = "0.10"
+generic-array = "0.14"
+rand = "0.8"
 
 [features]
 asm = [ "ark-ff/asm" ]
