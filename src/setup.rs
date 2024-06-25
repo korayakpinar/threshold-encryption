@@ -13,7 +13,7 @@ use crate::utils::lagrange_poly;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct SecretKey<E: Pairing> {
-    sk: E::ScalarField,
+    pub sk: E::ScalarField,
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
