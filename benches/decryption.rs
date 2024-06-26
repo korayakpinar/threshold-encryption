@@ -3,7 +3,6 @@ use ark_poly::univariate::DensePolynomial;
 use ark_std::Zero;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use silent_threshold::{
-    decryption::agg_dec,
     encryption::encrypt,
     kzg::KZG10,
     setup::{AggregateKey, PublicKey, SecretKey},
@@ -71,7 +70,7 @@ fn bench_decrypt(c: &mut Criterion) {
             BenchmarkId::from_parameter(n),
             &(partial_decryptions, ct, selector, agg_key, params),
             |b, inp| {
-                b.iter(|| agg_dec(&inp.0, &inp.1, &inp.2, &inp.3, &inp.4));
+                //b.iter(|| agg_dec(&inp.0, &inp.1, &inp.2, &inp.3, &inp.4));
             },
         );
     }

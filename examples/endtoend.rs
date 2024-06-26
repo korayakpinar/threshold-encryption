@@ -115,7 +115,7 @@ fn main() {
         selector.push(false);
     }
 
-    let _dec_key = agg_dec(&partial_decryptions, &ct, &selector, &agg_key, &params);
+    let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, t, &selector, &agg_key, &params);
     println!("Gamma_G2: {}", ct.gamma_g2);
     let x = ct.gamma_g2.into_affine();
     let s = G2Point{ g2: x };

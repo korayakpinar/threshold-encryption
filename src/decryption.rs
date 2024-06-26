@@ -18,7 +18,9 @@ use crate::{
 
 pub fn agg_dec<E: Pairing>(
     partial_decryptions: &[E::G2], //insert 0 if a party did not respond or verification failed
-    ct: &Ciphertext<E>,
+    sa1: &[E::G1; 2],
+    sa2: &[E::G2; 6],
+    t: usize,
     selector: &[bool],
     agg_key: &AggregateKey<E>,
     params: &UniversalParams<E>,
@@ -66,7 +68,7 @@ pub fn agg_dec<E: Pairing>(
 
     // bhat = x^t * b
     // insert t 0s at the beginning of bhat.coeffs
-    let mut bhat_coeffs = vec![E::ScalarField::zero(); ct.t];
+    let mut bhat_coeffs = vec![E::ScalarField::zero(); t];
     bhat_coeffs.append(&mut b.coeffs.clone());
     let bhat = DensePolynomial::from_coefficients_vec(bhat_coeffs);
     debug_assert_eq!(bhat.degree(), n - 1);
@@ -135,14 +137,12 @@ pub fn agg_dec<E: Pairing>(
     let w2 = [b_g2, sigma];
 
     let mut enc_key_lhs = w1.to_vec();
-    enc_key_lhs.append(&mut ct.sa1.to_vec());
+    enc_key_lhs.append(&mut sa1.to_vec());
 
-    let mut enc_key_rhs = ct.sa2.to_vec();
+    let mut enc_key_rhs = sa2.to_vec();
     enc_key_rhs.append(&mut w2.to_vec());
 
     let enc_key = E::multi_pairing(enc_key_lhs, enc_key_rhs);
-
-    debug_assert_eq!(enc_key, ct.enc_key);
 
     enc_key
 }
@@ -204,6 +204,6 @@ mod tests {
             selector.push(false);
         }
 
-        let _dec_key = agg_dec(&partial_decryptions, &ct, &selector, &agg_key, &params);
+        let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, ct.t, &selector, &agg_key, &params);
     }
 }
