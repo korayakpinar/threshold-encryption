@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, fs::File, io::Cursor};
+use std::{fs::File, io::Cursor};
 
 use ark_serialize::Read;
 use serde::{Deserialize, Serialize};
@@ -6,14 +6,14 @@ use serde_json;
 use hex;
 
 use ark_bls12_381::{Bls12_381, G1Affine, G2Affine};
-use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ec::pairing::Pairing;
 use ark_poly::univariate::DensePolynomial;
 use ark_std::{rand::Rng, Zero};
 use rand::rngs::OsRng;
 use silent_threshold::{
     decryption::agg_dec,
     encryption::encrypt,
-    kzg::{UniversalParams, KZG10},
+    kzg::UniversalParams,
     setup::{AggregateKey, PublicKey, SecretKey},
 };
 use sha2::{Sha256, Digest};
@@ -24,7 +24,6 @@ use block_modes::block_padding::Pkcs7;
 type E = Bls12_381;
 type G1 = <E as Pairing>::G1;
 type G2 = <E as Pairing>::G2;
-type UniPoly381 = DensePolynomial<<E as Pairing>::ScalarField>;
 type Aes256Cbc = Cbc<Aes256, Pkcs7>;
 
 use ark_serialize::*;
