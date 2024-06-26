@@ -1,5 +1,7 @@
+use std::io::Cursor;
+
 use ark_bls12_381::{Bls12_381, G2Affine};
-use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ec::pairing::Pairing;
 use ark_poly::univariate::DensePolynomial;
 use ark_std::{rand::Rng, Zero};
 use rand::rngs::OsRng;
@@ -21,49 +23,8 @@ type Aes256Cbc = Cbc<Aes256, Pkcs7>;
 
 use ark_serialize::*;
 
-// Custom Serializer for G2Affine
-fn serialize_g2<S>(value: &G2Affine, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut bytes = Vec::new();
-    value.serialize_compressed(&mut bytes).map_err(serde::ser::Error::custom)?;
-    serializer.serialize_bytes(&bytes)
-}
-
-use std::{fmt, io::Cursor};
-
-// Custom Deserializer for G2Affine
-fn deserialize_g2<'de, D>(deserializer: D) -> Result<G2Affine, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct G2Visitor;
-
-    impl<'de> Visitor<'de> for G2Visitor {
-        type Value = G2Affine;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a valid serialized G2Affine point")
-        }
-
-        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            G2Affine::deserialize_compressed(v).map_err(de::Error::custom)
-        }
-    }
-
-    deserializer.deserialize_bytes(G2Visitor)
-}
-
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use serde::de::{self, Visitor};
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, CanonicalSerialize, CanonicalDeserialize)]
 struct G2Point {
-    #[serde(serialize_with = "serialize_g2", deserialize_with = "deserialize_g2")]
     pub g2: G2Affine,
 }
 
@@ -118,9 +79,9 @@ fn main() {
     let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, t, &selector, &agg_key, &params);
     println!("Gamma_G2: {:#?}", ct.gamma_g2);
     let mut s1: Vec<u8> = Vec::new();
-    ct.gamma_g2.serialize_compressed(&mut s1);
+    ct.gamma_g2.serialize_compressed(&mut s1).expect("Can't unwrap");
     println!("Gamma_G2: {:#?}", s1);
-    let x = G2Affine::deserialize_compressed(s1);
+    //let x = G2Affine::deserialize_compressed(s1);
     let _z = ct.gamma_g2 * sk[1].sk;
     let v = sk[1].sk;
     let mut m = Vec::new();

@@ -1,3 +1,4 @@
+#![allow(non_snake_case, dead_code, unused_variables, unused_imports)]
 use std::{fs::File, io::Cursor};
 
 use ark_serialize::Read;
@@ -7,11 +8,10 @@ use hex;
 
 use ark_bls12_381::{Bls12_381, G1Affine, G2Affine};
 use ark_ec::pairing::Pairing;
-use ark_poly::univariate::DensePolynomial;
 use ark_std::{rand::Rng, Zero};
 use rand::rngs::OsRng;
 use silent_threshold::{
-    decryption::agg_dec,
+    decryption::{agg_dec, part_verify},
     encryption::encrypt,
     kzg::UniversalParams,
     setup::{AggregateKey, PublicKey, SecretKey},
@@ -58,26 +58,36 @@ struct KZG {
 fn convert_hex_to_g1(g1_powers: &Vec<String>) -> Vec<G1Affine> {
     let mut g1_powers_decompressed = Vec::new();
 
+    let mut j = 0;
+    let len = g1_powers.len();
     for i in g1_powers {
         let g1_vec: Vec<u8> = hex::decode(i.clone().split_off(2)).unwrap();
         let mut cur = Cursor::new(g1_vec);
         let g1 = G1Affine::deserialize_compressed(&mut cur).unwrap();
         g1_powers_decompressed.push(g1);
+        print!("{}/{}\t\r", j, len);
         // println!("{:#?}", g1);
+        j += 1;
     }
+    print!("\n");
 
     g1_powers_decompressed
 }
 
 fn convert_hex_to_g2(g2_powers: &Vec<String>) -> Vec<G2Affine> {
     let mut g2_powers_decompressed = Vec::new();
+    let mut j = 0;
+    let len = g2_powers.len();
     for i in g2_powers {
         let g2_powers: Vec<u8> = hex::decode(i.clone().split_off(2)).unwrap();
         let mut cur = Cursor::new(g2_powers);
         let g2 = G2Affine::deserialize_compressed(&mut cur).unwrap();
         g2_powers_decompressed.push(g2);
+        print!("{}/{}\t\r", j, len);
+        j += 1;
         // println!("{:#?}", g2);
     }
+    print!("\n");
 
     g2_powers_decompressed
 }
@@ -92,11 +102,11 @@ fn main() {
     let json: KZG = serde_json::from_str::<KZG>(&mut contents).unwrap().into();
     println!("numG1Powers: {}", json.transcripts[3].numG1Powers);
 
-    let powers_of_g = convert_hex_to_g1(&json.transcripts[3].powersOfTau.G1Powers);
-    let powers_of_h = convert_hex_to_g2(&json.transcripts[3].powersOfTau.G2Powers);
+    let powers_of_g = convert_hex_to_g1(&json.transcripts[2].powersOfTau.G1Powers);
+    let powers_of_h = convert_hex_to_g2(&json.transcripts[2].powersOfTau.G2Powers);
 
     let n = 1 << 5;
-    let t: usize = 2;
+    let t: usize = 4;
     let params = UniversalParams { powers_of_g, powers_of_h };
 
     let mut sk: Vec<SecretKey<E>> = Vec::new();
@@ -114,7 +124,7 @@ fn main() {
 
     //println!("size of sk[0], {}", std::mem::size_of_val(&sk[2]));
     
-    let agg_key = AggregateKey::<E>::new(pk, &params);
+    let agg_key = AggregateKey::<E>::new(pk.clone(), &params);
     let ct = encrypt::<E>(&agg_key, t, &params);
 
     println!("Encrypted ciphertext: {:?}", ct.enc_key.to_string());
@@ -123,7 +133,8 @@ fn main() {
     let mut partial_decryptions: Vec<G2> = Vec::new();
     for i in 0..t + 1 {
         let tmp = sk[i].partial_decryption(&ct);
-        println!("tmp: {}", sk[i].sk);
+        let x = part_verify(ct.gamma_g2, (pk.clone()).get(i).unwrap().to_owned(), params.powers_of_g[0].into(), tmp.clone());
+        println!("part_verify = {}", x);
         partial_decryptions.push(tmp);
     }
     for _ in t + 1..n {

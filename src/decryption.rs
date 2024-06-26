@@ -1,6 +1,6 @@
+use ark_bls12_381::Bls12_381;
 use ark_ec::{
-    pairing::{Pairing, PairingOutput},
-    VariableBaseMSM,
+    pairing::{Pairing, PairingOutput}, VariableBaseMSM
 };
 use ark_poly::{
     univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, Polynomial,
@@ -11,7 +11,7 @@ use std::ops::Div;
 
 use crate::{
     kzg::{UniversalParams, KZG10},
-    setup::AggregateKey,
+    setup::{AggregateKey, PublicKey},
     utils::interp_mostly_zero,
 };
 
@@ -144,6 +144,10 @@ pub fn agg_dec<E: Pairing>(
     let enc_key = E::multi_pairing(enc_key_lhs, enc_key_rhs);
 
     enc_key
+}
+
+pub fn part_verify(gamma_g2: <Bls12_381 as Pairing>::G2, pk: PublicKey<Bls12_381>, g1: <Bls12_381 as Pairing>::G1, part_dec: <Bls12_381 as Pairing>::G2) -> bool {
+    Bls12_381::pairing(pk.bls_pk, gamma_g2) == Bls12_381::pairing(g1, part_dec)
 }
 
 #[cfg(test)]

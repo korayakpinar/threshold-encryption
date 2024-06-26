@@ -1,7 +1,8 @@
-use actix_web::web::Bytes;
+#![allow(non_snake_case, dead_code, unused_variables, unused_imports)]
+// TODO: make all the expects into unwraps
 use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer};
 use ark_ec::pairing::Pairing;
-use ark_ec::{AffineRepr, CurveGroup};
+use ark_ec::AffineRepr;
 
 use ark_bls12_381::{Bls12_381, G1Affine, G2Affine};
 use ark_serialize::*;
@@ -11,21 +12,22 @@ use aes::Aes256;
 use block_modes::{BlockMode, Cbc};
 use block_modes::block_padding::Pkcs7;
 
-use serde::{Serialize, Deserialize};
-
 #[macro_use]
 extern crate lazy_static;
 
 use std;
 use std::fs::File;
 use std::io::Cursor;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::Mutex;
 
-use hex::{self, ToHex};
+use hex;
+use serde_json;
+use serde::{Serialize, Deserialize};
 
-use silent_threshold::setup::{AggregateKey, DecryptParams, PublicKey, SecretKey, SetupParams};
+use silent_threshold::setup::{AggregateKey, DecryptParams, PublicKey, SecretKey};
 use silent_threshold::kzg::UniversalParams;
-use silent_threshold::decryption::agg_dec;
+use silent_threshold::decryption::{agg_dec, part_verify};
+use silent_threshold::utils::{KZG, convert_hex_to_g1, convert_hex_to_g2};
 
 type E = Bls12_381;
 type G2 = <E as Pairing>::G2;
@@ -33,10 +35,20 @@ type G1 = <E as Pairing>::G1;
 type Aes256Cbc = Cbc<Aes256, Pkcs7>;
 
 lazy_static! {
-    static ref kzg_setup: Mutex<UniversalParams<E>> = {
-        let powers_of_g: Vec<G1Affine> = Vec::new();
-        let powers_of_h: Vec<G2Affine> = Vec::new();
-        Mutex::new(UniversalParams { powers_of_g, powers_of_h })
+    static ref kzg_setup: UniversalParams<E> = {
+        let mut file = File::open("transcript.json").unwrap();
+
+        let mut contents: String = String::new();
+        file.read_to_string(&mut contents).unwrap();
+
+        println!("size: {}", contents.len());
+        let json: KZG = serde_json::from_str::<KZG>(&mut contents).unwrap().into();
+        println!("numG1Powers: {}", json.transcripts[3].numG1Powers);
+
+        let powers_of_g = convert_hex_to_g1(&json.transcripts[3].powersOfTau.G1Powers);
+        let powers_of_h = convert_hex_to_g2(&json.transcripts[3].powersOfTau.G2Powers);
+
+        UniversalParams { powers_of_g, powers_of_h }
     };
 
     static ref sk: SecretKey<E> = {
@@ -48,99 +60,75 @@ lazy_static! {
         let deserialized: <E as Pairing>::ScalarField = CanonicalDeserialize::deserialize_compressed(&mut cursor).expect("Unable to deserialize the data!");
         SecretKey { sk: deserialized }
     };
-
-    // TODO: remove
-    static ref partial_decryptions: Mutex<Vec<G2>> = {
-        let g2: G2 = G2Affine::from_random_bytes(&[0]).expect("Can't generate random").into();
-        Mutex::new(vec![g2])
-    };
-
-    // TODO: remove the following
-    static ref C: Mutex<usize> = Mutex::new(0);
-    static ref busy: Mutex<i32> = Mutex::new(0);
-    static ref params: Mutex<DecryptParams> = {
-        let g1: G1 = G1Affine::from_random_bytes(&[0]).expect("Can't generate random").into();
-        let g2: G2 = G2Affine::from_random_bytes(&[0]).expect("Can't generate random").into();
-        let enc: Vec<u8> = Vec::new();
-        Mutex::new(SetupParams {
-            enc,
-            sa1: [g1; 2],
-            sa2: [g2; 6],
-            n: 0,
-            t: 0,
-            iv: Vec::new()
-        })
-    };
-
-    static ref public_keys: Mutex<Vec<PublicKey<E>>> = Mutex::new(Vec::new());
 }
 
-async fn part_dec(st: String) -> HttpResponse {
+#[derive(CanonicalSerialize, CanonicalDeserialize)]
+struct Parameters {
+    decrypt: DecryptParams,
+    pks: Vec<PublicKey<E>>,
+    parts: Vec<G2>
+}
+
+async fn decrypt_part(st: String) -> HttpResponse {
     let bytes = hex::decode(st).expect("Can't decode data from hex!");
     let projective: G2 = G2Affine::deserialize_compressed(bytes.as_slice()).expect("Can't deserialize the data").into();
     
+    // gamma_g2 * sk
     let val = projective * sk.sk;
     
-    let mut writer = Vec::new();
-    val.serialize_compressed(&mut writer);
-    HttpResponse::Ok().body(hex::encode(writer))
+    let mut result = Vec::new();
+    val.serialize_compressed(&mut result).expect("Can't serialize val");
+    HttpResponse::Ok().body(hex::encode(result))
 }
 
-// TODO: remove this
-async fn setup(config: web::Json<SetupParams>) -> HttpResponse {
-    let mut b = busy.lock().expect("Can't lock busy");
-    let mut p = params.lock().expect("Can't lock params");
-    // Fix this part also
-    if *b == 0 {
-        *b = 1;
-        *p = config.0;
-    } else {
-        return HttpResponse::BadRequest().finish();
+async fn decrypt(data: String) -> HttpResponse {
+    println!("{}", data);
+    let bytes = hex::decode(data).expect("Can't decode data");
+    let mut cur = Cursor::new(&bytes);
+    let params = Parameters::deserialize_compressed(&mut cur).expect("Can't deserialize Parameters");
+
+    let mut selector: Vec<bool> = Vec::new();
+    for _ in 0..params.decrypt.t + 1 {
+        selector.push(true);
     }
-    // get the sa1 sa2 n t and remove the other mutexes from lazy_static
-    HttpResponse::Ok().json("OK")
+    for _ in params.decrypt.t + 1..params.decrypt.n {
+        selector.push(false);
+    }
+    
+    let aggregated = AggregateKey::<E>::new(params.pks.clone(), &kzg_setup);
+
+    let key = agg_dec(&params.parts, &params.decrypt.sa1, &params.decrypt.sa2, params.decrypt.t, &selector, &aggregated, &kzg_setup);
+
+    let mut hasher = Sha256::new();
+    hasher.update(key.to_string().as_bytes());
+    let result = hasher.finalize();
+
+    let key = result.as_slice();
+    
+    let cipher_dec = Aes256Cbc::new_from_slices(&key, &params.decrypt.iv).unwrap();
+    let decrypted = cipher_dec.decrypt_vec(&params.decrypt.enc).expect("Failed to decrypt");
+
+    HttpResponse::Ok().body(hex::encode(decrypted))
 }
 
-async fn decrypt(point: web::Json<G2Point>) -> HttpResponse {
-    let mut count = C.lock().expect("Couldn't lock C");
-    let mut p = params.lock().expect("Couldn't lock params");
-    let mut parts = partial_decryptions.lock().expect("Can't lock the partial decryptions");
-    let part: G2 = point.0.g2.into();
+#[derive(CanonicalSerialize, CanonicalDeserialize)]
+struct VerifyPart {
+    gamma_g2: G2,
+    pk: PublicKey<E>,
+    g1: G1,
+    part_dec: G2
+}
 
-    if *count == p.t {
-        let mut selector: Vec<bool> = Vec::new();
-        for _ in 0..p.t + 1 {
-            selector.push(true);
-        }
-        for _ in p.t + 1..p.n {
-            selector.push(false);
-        }
-        let mut kzg = kzg_setup.lock().expect("Can't lock kzg setup");
-        
-        let mut pks = public_keys.lock().expect("Can't lock public keys");
-        let aggregated = AggregateKey::<E>::new(pks.clone(), &(kzg.clone()));
-
-        let key = agg_dec(&parts, &p.sa1, &p.sa2, p.t, &selector, &aggregated, &kzg);
-
-        let mut hasher = Sha256::new();
-        hasher.update(key.to_string().as_bytes());
-        let result = hasher.finalize();
-
-        let key = result.as_slice();
-        
-        let cipher_dec = Aes256Cbc::new_from_slices(&key, &p.iv).unwrap();
-        let decrypted = cipher_dec.decrypt_vec(&p.enc).unwrap_or(Vec::from([2, 2]));
-
-        // I think this is dangerous and should be placed somewhere else, need you to review this.
-        if decrypted == Vec::from([2, 2]) {
-            return HttpResponse::BadRequest().finish();
-        }
-    } else if !parts.contains(&part) {
-        *count += 1;
-        (*parts).push(part);
+async fn verify_decryption_part(data: String) -> HttpResponse {
+    println!("{}", data);
+    let bytes = hex::decode(data).expect("Can't decode data");
+    let mut cur = Cursor::new(&bytes);
+    let verify = VerifyPart::deserialize_compressed(&mut cur).expect("Can't deserialize Parameters");
+    let p = part_verify(verify.gamma_g2, verify.pk, verify.g1, verify.part_dec);
+    if p == true {
+        return HttpResponse::Ok().finish();
     }
-
-    HttpResponse::Ok().finish()
+    HttpResponse::UnavailableForLegalReasons().finish() // LOL
 }
 
 #[actix_web::main]
@@ -154,9 +142,9 @@ async fn main() -> std::io::Result<()> {
             // enable logger
             .wrap(middleware::Logger::default())
             .app_data(web::JsonConfig::default().limit(240000)) // <- limit size of the payload (global configuration)
-            .service(web::resource("/setup").route(web::post().to(setup)))
+            .service(web::resource("/partdec").route(web::post().to(decrypt_part)))
             .service(web::resource("/decrypt").route(web::post().to(decrypt)))
-            .service(web::resource("/partdec").route(web::post().to(part_dec)))
+            .service(web::resource("/verifydec").route(web::post().to(verify_decryption_part)))
     })
     .bind(("127.0.0.1", 8080))?
     .run()

@@ -69,7 +69,7 @@ fn bench_decrypt(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::from_parameter(n),
             &(partial_decryptions, ct, selector, agg_key, params),
-            |b, inp| {
+            |_, _| {
                 //b.iter(|| agg_dec(&inp.0, &inp.1, &inp.2, &inp.3, &inp.4));
             },
         );
