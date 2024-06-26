@@ -13,6 +13,7 @@ use serde::de::{self, Visitor};
 #[macro_use]
 extern crate lazy_static;
 
+use std::borrow::BorrowMut;
 use std::fmt;
 use std;
 use std::fs::File;
@@ -55,18 +56,18 @@ lazy_static! {
     };
 
     static ref C: Mutex<i32> = Mutex::new(0);
-    static ref busy: bool = false;
-    static ref params: SetupParams = {
+    static ref busy: Mutex<i32> = Mutex::new(0);
+    static ref params: Mutex<SetupParams> = {
         let g1: G1 = G1Affine::from_random_bytes(&[0]).expect("Can't generate random").into();
         let g2: G2 = G2Affine::from_random_bytes(&[0]).expect("Can't generate random").into();
         let enc: Vec<u8> = Vec::new();
-        SetupParams {
+        Mutex::new(SetupParams {
             enc,
             sa1: [g1; 2],
             sa2: [g2; 6],
             n: 0,
             t: 0
-        }
+        })
     };
 }
 
@@ -123,21 +124,31 @@ async fn part_dec(point: web::Json<G2Point>) -> HttpResponse {
 }
 
 //#[post("/setup")]
-async fn setup() -> HttpResponse {
+async fn setup(config: web::Json<SetupParams>) -> HttpResponse {
+    let mut b = busy.lock().expect("Can't lock busy");
+    let mut p = params.lock().expect("Can't lock params");
+    // Fix this part also
+    if *b == 0 {
+        *b = 1;
+        *p = config.0;
+    } else {
+        return HttpResponse::BadRequest().finish();
+    }
     // get the sa1 sa2 n t and remove the other mutexes from lazy_static
     HttpResponse::Ok().json("OK")
 }
 
 //#[post("/decrypt")]
 async fn decrypt(point: web::Json<G2Point>) -> HttpResponse {
-    let count = C.lock().expect("Couldn't get C");
+    let mut count = C.lock().expect("Couldn't get C");
+    let p = params.lock().expect("Couldn't lock params");
     let parts = partial_decryptions.lock().expect("Can't lock the partial decryptions");
     
     let part: G2 = point.0.g2.into();
 
-    if count.abs() == params.t {
+    if count.abs() == p.t {
         // Fix this line
-        agg_dec(&parts, params.sa1, params.sa2, params.t, selector, params)
+        agg_dec(&parts, &p.sa1, &p.sa2, p.t, selector, params)
     } else if !parts.contains(&part) {
         *count += 1;
         (*parts).push(part);
@@ -157,8 +168,9 @@ async fn main() -> std::io::Result<()> {
             // enable logger
             .wrap(middleware::Logger::default())
             .app_data(web::JsonConfig::default().limit(240000)) // <- limit size of the payload (global configuration)
-            .service(web::resource("/partdec").route(web::post().to(part_dec)))
+            .service(web::resource("/setup").route(web::post().to(setup)))
             .service(web::resource("/decrypt").route(web::post().to(decrypt)))
+            .service(web::resource("/partdec").route(web::post().to(part_dec)))
     })
     .bind(("127.0.0.1", 8080))?
     .run()
