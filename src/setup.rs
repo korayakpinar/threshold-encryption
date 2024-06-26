@@ -1,3 +1,4 @@
+use ark_bls12_381::Bls12_381;
 use ark_ec::pairing::PairingOutput;
 // use crate::utils::{lagrange_coefficients, transpose};
 use ark_ec::{pairing::Pairing, Group};
@@ -14,6 +15,16 @@ use crate::utils::lagrange_poly;
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct SecretKey<E: Pairing> {
     pub sk: E::ScalarField,
+}
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct DecryptParams {
+    pub enc: Vec<u8>,
+    pub sa1: [<Bls12_381 as Pairing>::G1; 2],
+    pub sa2: [<Bls12_381 as Pairing>::G2; 6],
+    pub iv: Vec<u8>,
+    pub n: usize,
+    pub t: usize
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]

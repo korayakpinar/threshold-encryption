@@ -1,44 +1,36 @@
-use actix_web::{App, middleware, get, post, web, HttpServer, HttpResponse};
-use ark_ec::pairing::{Pairing, PairingOutput};
+use actix_web::web::Bytes;
+use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer};
+use ark_ec::pairing::Pairing;
 use ark_ec::{AffineRepr, CurveGroup};
-use log::{debug, error, log_enabled, info, Level};
 
 use ark_bls12_381::{Bls12_381, G1Affine, G2Affine};
 use ark_serialize::*;
 
-use rand::rngs::OsRng;
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use serde::de::{self, Visitor};
+use sha2::{Sha256, Digest};
+use aes::Aes256;
+use block_modes::{BlockMode, Cbc};
+use block_modes::block_padding::Pkcs7;
+
+use serde::{Serialize, Deserialize};
 
 #[macro_use]
 extern crate lazy_static;
 
-use std::borrow::BorrowMut;
-use std::fmt;
 use std;
 use std::fs::File;
 use std::io::Cursor;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
-use rand::Rng;
+use hex::{self, ToHex};
 
-use silent_threshold::setup::SecretKey;
+use silent_threshold::setup::{AggregateKey, DecryptParams, PublicKey, SecretKey, SetupParams};
 use silent_threshold::kzg::UniversalParams;
 use silent_threshold::decryption::agg_dec;
 
 type E = Bls12_381;
 type G2 = <E as Pairing>::G2;
 type G1 = <E as Pairing>::G1;
-
-// Add serializer, deserializer
-#[derive(Debug, Serialize, Deserialize)]
-struct SetupParams {
-    enc: Vec<u8>,
-    sa1: [G1; 2],
-    sa2: [G2; 6],
-    n: usize,
-    t: usize
-}
+type Aes256Cbc = Cbc<Aes256, Pkcs7>;
 
 lazy_static! {
     static ref kzg_setup: Mutex<UniversalParams<E>> = {
@@ -49,21 +41,24 @@ lazy_static! {
 
     static ref sk: SecretKey<E> = {
         let mut file = File::open("~/.sk").expect("Can't open the file!");
-        let mut contents: Vec<u8> = Vec::new();
-        file.read(&mut contents).expect("Can't read the file!");
-        let mut cursor = Cursor::new(contents.clone());
+        let mut contents: String = String::new();
+        file.read_to_string(&mut contents).expect("Can't read the file!");
+        let mut bytes: Vec<u8> = hex::decode(&contents).expect("Can't decode hex"); // TODO: Fix this
+        let mut cursor = Cursor::new(&mut bytes);
         let deserialized: <E as Pairing>::ScalarField = CanonicalDeserialize::deserialize_compressed(&mut cursor).expect("Unable to deserialize the data!");
         SecretKey { sk: deserialized }
     };
 
+    // TODO: remove
     static ref partial_decryptions: Mutex<Vec<G2>> = {
         let g2: G2 = G2Affine::from_random_bytes(&[0]).expect("Can't generate random").into();
         Mutex::new(vec![g2])
     };
 
-    static ref C: Mutex<i32> = Mutex::new(0);
+    // TODO: remove the following
+    static ref C: Mutex<usize> = Mutex::new(0);
     static ref busy: Mutex<i32> = Mutex::new(0);
-    static ref params: Mutex<SetupParams> = {
+    static ref params: Mutex<DecryptParams> = {
         let g1: G1 = G1Affine::from_random_bytes(&[0]).expect("Can't generate random").into();
         let g2: G2 = G2Affine::from_random_bytes(&[0]).expect("Can't generate random").into();
         let enc: Vec<u8> = Vec::new();
@@ -72,64 +67,26 @@ lazy_static! {
             sa1: [g1; 2],
             sa2: [g2; 6],
             n: 0,
-            t: 0
+            t: 0,
+            iv: Vec::new()
         })
     };
+
+    static ref public_keys: Mutex<Vec<PublicKey<E>>> = Mutex::new(Vec::new());
 }
 
-
-// Custom Serializer for G2Affine
-fn serialize_g2<S>(value: &G2Affine, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut bytes = Vec::new();
-    value.serialize_compressed(&mut bytes).map_err(serde::ser::Error::custom)?;
-    serializer.serialize_bytes(&bytes)
+async fn part_dec(st: String) -> HttpResponse {
+    let bytes = hex::decode(st).expect("Can't decode data from hex!");
+    let projective: G2 = G2Affine::deserialize_compressed(bytes.as_slice()).expect("Can't deserialize the data").into();
+    
+    let val = projective * sk.sk;
+    
+    let mut writer = Vec::new();
+    val.serialize_compressed(&mut writer);
+    HttpResponse::Ok().body(hex::encode(writer))
 }
 
-
-// Custom Deserializer for G2Affine
-fn deserialize_g2<'de, D>(deserializer: D) -> Result<G2Affine, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct G2Visitor;
-
-    impl<'de> Visitor<'de> for G2Visitor {
-        type Value = G2Affine;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a valid serialized G2Affine point")
-        }
-
-        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            G2Affine::deserialize_compressed(v).map_err(de::Error::custom)
-        }
-    }
-
-    deserializer.deserialize_bytes(G2Visitor)
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct G2Point {
-    #[serde(serialize_with = "serialize_g2", deserialize_with = "deserialize_g2")]
-    pub g2: G2Affine,
-}
-
-//#[post("/part_dec")]
-async fn part_dec(point: web::Json<G2Point>) -> HttpResponse {
-    let projective: G2 = point.0.g2.into();
-    println!("{projective}");
-    let ret = projective * sk.sk;
-    let return_point = G2Point { g2: ret.into_affine() };
-    HttpResponse::Ok().json(return_point)
-}
-
-//#[post("/setup")]
+// TODO: remove this
 async fn setup(config: web::Json<SetupParams>) -> HttpResponse {
     let mut b = busy.lock().expect("Can't lock busy");
     let mut p = params.lock().expect("Can't lock params");
@@ -144,15 +101,13 @@ async fn setup(config: web::Json<SetupParams>) -> HttpResponse {
     HttpResponse::Ok().json("OK")
 }
 
-//#[post("/decrypt")]
 async fn decrypt(point: web::Json<G2Point>) -> HttpResponse {
-    let mut count = C.lock().expect("Couldn't get C");
-    let p = params.lock().expect("Couldn't lock params");
-    let parts = partial_decryptions.lock().expect("Can't lock the partial decryptions");
-    
+    let mut count = C.lock().expect("Couldn't lock C");
+    let mut p = params.lock().expect("Couldn't lock params");
+    let mut parts = partial_decryptions.lock().expect("Can't lock the partial decryptions");
     let part: G2 = point.0.g2.into();
 
-    if count.abs() == p.t.into() {
+    if *count == p.t {
         let mut selector: Vec<bool> = Vec::new();
         for _ in 0..p.t + 1 {
             selector.push(true);
@@ -160,13 +115,32 @@ async fn decrypt(point: web::Json<G2Point>) -> HttpResponse {
         for _ in p.t + 1..p.n {
             selector.push(false);
         }
-        agg_dec(&parts, &p.sa1, &p.sa2, p.t, &selector, );
+        let mut kzg = kzg_setup.lock().expect("Can't lock kzg setup");
+        
+        let mut pks = public_keys.lock().expect("Can't lock public keys");
+        let aggregated = AggregateKey::<E>::new(pks.clone(), &(kzg.clone()));
+
+        let key = agg_dec(&parts, &p.sa1, &p.sa2, p.t, &selector, &aggregated, &kzg);
+
+        let mut hasher = Sha256::new();
+        hasher.update(key.to_string().as_bytes());
+        let result = hasher.finalize();
+
+        let key = result.as_slice();
+        
+        let cipher_dec = Aes256Cbc::new_from_slices(&key, &p.iv).unwrap();
+        let decrypted = cipher_dec.decrypt_vec(&p.enc).unwrap_or(Vec::from([2, 2]));
+
+        // I think this is dangerous and should be placed somewhere else, need you to review this.
+        if decrypted == Vec::from([2, 2]) {
+            return HttpResponse::BadRequest().finish();
+        }
     } else if !parts.contains(&part) {
         *count += 1;
         (*parts).push(part);
     }
 
-    HttpResponse::Ok().json("return_point")
+    HttpResponse::Ok().finish()
 }
 
 #[actix_web::main]

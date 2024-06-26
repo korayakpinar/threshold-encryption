@@ -10,7 +10,6 @@ use ark_std::{One, Zero};
 use std::ops::Div;
 
 use crate::{
-    encryption::Ciphertext,
     kzg::{UniversalParams, KZG10},
     setup::AggregateKey,
     utils::interp_mostly_zero,
