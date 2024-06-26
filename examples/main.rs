@@ -23,7 +23,7 @@ use std::sync::Mutex;
 use rand::Rng;
 
 use silent_threshold::setup::SecretKey;
-use silent_threshold::encryption::Ciphertext;
+use silent_threshold::kzg::UniversalParams;
 use silent_threshold::decryption::agg_dec;
 
 type E = Bls12_381;
@@ -36,11 +36,17 @@ struct SetupParams {
     enc: Vec<u8>,
     sa1: [G1; 2],
     sa2: [G2; 6],
-    n: i32,
-    t: i32
+    n: usize,
+    t: usize
 }
 
 lazy_static! {
+    static ref kzg_setup: Mutex<UniversalParams<E>> = {
+        let powers_of_g: Vec<G1Affine> = Vec::new();
+        let powers_of_h: Vec<G2Affine> = Vec::new();
+        Mutex::new(UniversalParams { powers_of_g, powers_of_h })
+    };
+
     static ref sk: SecretKey<E> = {
         let mut file = File::open("~/.sk").expect("Can't open the file!");
         let mut contents: Vec<u8> = Vec::new();
@@ -146,9 +152,15 @@ async fn decrypt(point: web::Json<G2Point>) -> HttpResponse {
     
     let part: G2 = point.0.g2.into();
 
-    if count.abs() == p.t {
-        // Fix this line
-        agg_dec(&parts, &p.sa1, &p.sa2, p.t, selector, params)
+    if count.abs() == p.t.into() {
+        let mut selector: Vec<bool> = Vec::new();
+        for _ in 0..p.t + 1 {
+            selector.push(true);
+        }
+        for _ in p.t + 1..p.n {
+            selector.push(false);
+        }
+        agg_dec(&parts, &p.sa1, &p.sa2, p.t, &selector, );
     } else if !parts.contains(&part) {
         *count += 1;
         (*parts).push(part);
