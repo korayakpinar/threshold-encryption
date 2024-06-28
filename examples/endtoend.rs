@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use ark_bls12_381::{Bls12_381, G2Affine};
-use ark_ec::pairing::Pairing;
+use ark_ec::{bls12::Bls12, pairing::Pairing};
 use ark_poly::univariate::DensePolynomial;
 use ark_std::{rand::Rng, Zero};
 use rand::rngs::OsRng;
@@ -9,7 +9,7 @@ use silent_threshold::{
     decryption::agg_dec,
     encryption::encrypt,
     kzg::KZG10,
-    setup::{AggregateKey, PublicKey, SecretKey},
+    setup::{AggregateKey, PublicKey, SecretKey}, utils::lagrange_poly,
 };
 use sha2::{Sha256, Digest};
 use aes::Aes256;
@@ -30,7 +30,7 @@ struct G2Point {
 
 fn main() {
     let mut rng = OsRng;
-    let n = 1 << 5; // actually n-1 total parties. one party is a dummy party that is always true
+    let n = 1 << 8; // actually n-1 total parties. one party is a dummy party that is always true
     let t: usize = 9;
     debug_assert!(t < n);
 
@@ -39,14 +39,18 @@ fn main() {
     let mut sk: Vec<SecretKey<E>> = Vec::new();
     let mut pk: Vec<PublicKey<E>> = Vec::new();
 
+    let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>> = (0..n)
+        .map(|j| lagrange_poly(n, j))
+        .collect();
+
     // create the dummy party's keys
     sk.push(SecretKey::<E>::new(&mut rng));
     sk[0].nullify();
-    pk.push(sk[0].get_pk(0, &params, n));
+    pk.push(sk[0].get_pk(0, &params, n, &lagrange_polys));
 
     for i in 1..n {
         sk.push(SecretKey::<E>::new(&mut rng));
-        pk.push(sk[i].get_pk(i, &params, n))
+        pk.push(sk[i].get_pk(i, &params, n, &lagrange_polys))
     }
 
     //println!("size of sk[0], {}", std::mem::size_of_val(&sk[2]));

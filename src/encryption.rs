@@ -1,13 +1,19 @@
 use std::ops::Mul;
 
 use crate::{kzg::UniversalParams, setup::AggregateKey};
+use ark_bls12_381::Bls12_381;
+use ark_ec::bls12::Bls12;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     Group,
 };
+use ark_poly::univariate::DensePolynomial;
 use ark_serialize::*;
 use ark_std::{UniformRand, Zero};
 use rand::rngs::OsRng;
+
+type S = Bls12_381;
+type UniPoly381 = DensePolynomial<<S as Pairing>::ScalarField>;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct Ciphertext<E: Pairing> {
@@ -101,7 +107,7 @@ mod tests {
     use super::*;
     use crate::{
         kzg::KZG10,
-        setup::{PublicKey, SecretKey},
+        setup::{PublicKey, SecretKey}, utils::lagrange_poly,
     };
     use ark_poly::univariate::DensePolynomial;
 
@@ -119,9 +125,13 @@ mod tests {
         let mut sk: Vec<SecretKey<E>> = Vec::new();
         let mut pk: Vec<PublicKey<E>> = Vec::new();
 
+        let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as ark_ec::pairing::Pairing>::ScalarField>> = (0..n)
+            .map(|j| lagrange_poly(n, j))
+            .collect();
+
         for i in 0..n {
             sk.push(SecretKey::<E>::new(&mut rng));
-            pk.push(sk[i].get_pk(0, &params, n))
+            pk.push(sk[i].get_pk(0, &params, n, &lagrange_polys))
         }
 
         let ak = AggregateKey::<E>::new(pk, &params);

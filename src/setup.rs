@@ -10,7 +10,6 @@ use std::ops::{Mul, Sub};
 
 use crate::encryption::Ciphertext;
 use crate::kzg::{UniversalParams, KZG10};
-use crate::utils::lagrange_poly;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct SecretKey<E: Pairing> {
@@ -79,12 +78,12 @@ impl<E: Pairing> SecretKey<E> {
         self.sk = E::ScalarField::one()
     }
 
-    pub fn get_pk(&self, id: usize, params: &UniversalParams<E>, n: usize) -> PublicKey<E> {
+    pub fn get_pk(&self, id: usize, params: &UniversalParams<E>, n: usize, lagrange_polys: &Vec<DensePolynomial<E::ScalarField>>) -> PublicKey<E> {
         // TODO: This runs in quadratic time because we are not preprocessing the Li's
         // Fix this.
         let domain = Radix2EvaluationDomain::<E::ScalarField>::new(n).unwrap();
 
-        let li = lagrange_poly(n, id);
+        let li = lagrange_polys[id].clone();
 
         let mut sk_li_by_z = vec![];
         for j in 0..n {
@@ -92,8 +91,8 @@ impl<E: Pairing> SecretKey<E> {
                 li.clone().mul(&li).sub(&li)
             } else {
                 //cross-terms
-                let l_j = lagrange_poly(n, j);
-                l_j.mul(&li)
+                //let l_j = lagrange_polys[j].clone();
+                lagrange_polys[j].clone().mul(&li)
             };
 
             let f = num.divide_by_vanishing_poly(domain).unwrap().0;
@@ -171,6 +170,10 @@ impl<E: Pairing> AggregateKey<E> {
 
 #[cfg(test)]
 mod tests {
+    use ark_ec::bls12::Bls12;
+
+    use crate::utils::lagrange_poly;
+
     use super::*;
 
     type E = ark_bls12_381::Bls12_381;
@@ -182,12 +185,16 @@ mod tests {
         let n = 4;
         let params = KZG10::<E, UniPoly381>::setup(n, &mut rng).unwrap();
 
+        let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>> = (0..n)
+            .map(|j| lagrange_poly(n, j))
+            .collect();
+
         let mut sk: Vec<SecretKey<E>> = Vec::new();
         let mut pk: Vec<PublicKey<E>> = Vec::new();
 
         for i in 0..n {
             sk.push(SecretKey::<E>::new(&mut rng));
-            pk.push(sk[i].get_pk(0, &params, n))
+            pk.push(sk[i].get_pk(0, &params, n, &lagrange_polys))
         }
 
         let _ak = AggregateKey::<E>::new(pk, &params);

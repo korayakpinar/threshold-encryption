@@ -23,7 +23,7 @@ use silent_threshold::utils::{KZG, convert_hex_to_g1, convert_hex_to_g2};
 
 type E = Bls12_381;
 type G2 = <E as Pairing>::G2;
-type G1 = <E as Pairing>::G1;
+type _G1 = <E as Pairing>::G1;
 type Aes256Cbc = Cbc<Aes256, Pkcs7>;
 
 async fn decrypt_part(config: HttpRequest, data: String) -> HttpResponse {
@@ -52,6 +52,7 @@ async fn decrypt_part(config: HttpRequest, data: String) -> HttpResponse {
         log::error!("can't serialize gamma_g2 * sk");
         return HttpResponse::BadRequest().finish();
     }
+
     HttpResponse::Ok().body(hex::encode(result))
 }
 
@@ -120,12 +121,12 @@ async fn decrypt(config: HttpRequest, data: String) -> HttpResponse {
 struct VerifyPart {
     gamma_g2: G2,
     pk: PublicKey<E>,
-    g1: G1,
     part_dec: G2
 }
 
-async fn verify_decryption_part(data: String) -> HttpResponse {
-    // println!("{}", data);
+async fn verify_decryption_part(config: HttpRequest, data: String) -> HttpResponse {
+    let datum = config.app_data::<Data>().unwrap();
+    let kzg_setup = datum.clone().kzg_setup;
 
     let bytes_res = hex::decode(data);
     if bytes_res.is_err() {
@@ -143,7 +144,7 @@ async fn verify_decryption_part(data: String) -> HttpResponse {
     }
     let verify = verify_res.unwrap();
 
-    let p = part_verify(verify.gamma_g2, verify.pk, verify.g1, verify.part_dec);
+    let p = part_verify(verify.gamma_g2, verify.pk, kzg_setup.powers_of_g[0].into(), verify.part_dec);
     if p == true {
         return HttpResponse::Ok().finish();
     }
