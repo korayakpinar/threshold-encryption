@@ -13,7 +13,6 @@ use ark_serialize::*;
 // 1 at omega^i and 0 elsewhere on domain {omega^i}_{i \in [n]}
 pub fn lagrange_poly<F: FftField>(n: usize, i: usize) -> DensePolynomial<F> {
     debug_assert!(i < n);
-    //todo: check n is a power of 2
     let mut evals = vec![];
     for j in 0..n {
         let l_of_x: u64 = if i == j { 1 } else { 0 };

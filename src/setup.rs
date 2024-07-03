@@ -1,6 +1,4 @@
-use ark_bls12_381::Bls12_381;
 use ark_ec::pairing::PairingOutput;
-// use crate::utils::{lagrange_coefficients, transpose};
 use ark_ec::{pairing::Pairing, Group};
 use ark_poly::DenseUVPolynomial;
 use ark_poly::{domain::EvaluationDomain, univariate::DensePolynomial, Radix2EvaluationDomain};
@@ -14,16 +12,6 @@ use crate::kzg::{UniversalParams, KZG10};
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct SecretKey<E: Pairing> {
     pub sk: E::ScalarField,
-}
-
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
-pub struct DecryptParams {
-    pub enc: Vec<u8>,
-    pub sa1: [<Bls12_381 as Pairing>::G1; 2],
-    pub sa2: [<Bls12_381 as Pairing>::G2; 6],
-    pub iv: Vec<u8>,
-    pub n: usize,
-    pub t: usize
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
@@ -81,16 +69,16 @@ impl<E: Pairing> SecretKey<E> {
     pub fn get_pk(&self, id: usize, params: &UniversalParams<E>, n: usize, lagrange_polys: &Vec<DensePolynomial<E::ScalarField>>) -> PublicKey<E> {
         let domain = Radix2EvaluationDomain::<E::ScalarField>::new(n).unwrap();
 
-        let li = lagrange_polys[id].clone();
+        let li = &lagrange_polys[id];
 
         let mut sk_li_by_z = vec![];
         for j in 0..n {
             let num = if id == j {
-                li.clone().mul(&li).sub(&li)
+                li.mul(li).sub(li)
             } else {
                 //cross-terms
                 //let l_j = lagrange_polys[j].clone();
-                lagrange_polys[j].clone().mul(&li)
+                lagrange_polys[j].mul(li)
             };
 
             let f = num.divide_by_vanishing_poly(domain).unwrap().0;
@@ -109,7 +97,7 @@ impl<E: Pairing> SecretKey<E> {
             .expect("commitment failed")
             .into();
 
-        let mut f = &li * self.sk;
+        let mut f = li * self.sk;
         let sk_li = KZG10::commit_g1(params, &f)
             .expect("commitment failed")
             .into();

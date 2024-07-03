@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::{io::Cursor, mem::size_of_val};
 
 use ark_bls12_381::{Bls12_381, G2Affine};
 use ark_ec::{bls12::Bls12, pairing::Pairing};
@@ -6,10 +6,7 @@ use ark_poly::univariate::DensePolynomial;
 use ark_std::{rand::Rng, Zero};
 use rand::rngs::OsRng;
 use silent_threshold::{
-    decryption::agg_dec,
-    encryption::encrypt,
-    kzg::KZG10,
-    setup::{AggregateKey, PublicKey, SecretKey}, utils::lagrange_poly,
+    decryption::agg_dec, encryption::encrypt, kzg::KZG10, setup::{AggregateKey, PublicKey, SecretKey}, utils::lagrange_poly
 };
 use sha2::{Sha256, Digest};
 use aes::Aes256;
@@ -30,7 +27,7 @@ struct G2Point {
 
 fn main() {
     let mut rng = OsRng;
-    let n = 1 << 8; // actually n-1 total parties. one party is a dummy party that is always true
+    let n = 1 << 10; // actually n-1 total parties. one party is a dummy party that is always true
     let t: usize = 9;
     debug_assert!(t < n);
 
@@ -50,7 +47,12 @@ fn main() {
 
     for i in 1..n {
         sk.push(SecretKey::<E>::new(&mut rng));
-        pk.push(sk[i].get_pk(i, &params, n, &lagrange_polys))
+        pk.push(sk[i].get_pk(i, &params, n, &lagrange_polys));
+
+        let mut w = Vec::new();
+        pk[i].serialize_compressed(&mut w).unwrap();
+
+        println!("{}", w.len());
     }
 
     //println!("size of sk[0], {}", std::mem::size_of_val(&sk[2]));
@@ -60,6 +62,17 @@ fn main() {
 
     println!("Encrypted ciphertext: {:?}", ct.enc_key.to_string());
 
+    let mut w = Vec::new();
+    ct.sa2.serialize_compressed(&mut w).unwrap();
+
+    let c = Cursor::new(w);
+    let q: [G2; 6] = CanonicalDeserialize::deserialize_compressed(c.clone()).unwrap();
+
+    let z = ct.gamma_g2;
+    let c = G2Affine::from(z);
+    println!("{} {}", size_of_val(&z), size_of_val(&c));
+
+    println!("{}", ct.sa2 == q);
     // compute partial decryptions
     let mut partial_decryptions: Vec<G2> = Vec::new();
     for i in 0..t + 1 {
