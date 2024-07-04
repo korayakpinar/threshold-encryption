@@ -4,7 +4,6 @@ use ark_bls12_381::{Bls12_381, G2Affine};
 use ark_ec::{bls12::Bls12, pairing::Pairing};
 use ark_poly::univariate::DensePolynomial;
 use ark_std::{rand::Rng, Zero};
-use generic_array::typenum::PartialDiv;
 use rand::rngs::OsRng;
 use silent_threshold::{
     decryption::agg_dec, encryption::encrypt, kzg::KZG10, setup::{AggregateKey, PublicKey, SecretKey}, utils::lagrange_poly

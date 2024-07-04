@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use crate::{api::types::*, setup::PublicKey};
+use crate::api::types::*;
 use ark_serialize::CanonicalDeserialize;
 
 /*
