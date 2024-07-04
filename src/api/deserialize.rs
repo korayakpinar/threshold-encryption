@@ -50,20 +50,25 @@ pub fn deserialize_decrypt_params(proto: DecryptParamsProto) -> Option<DecryptPa
     }
     let sa2: [G2; 6] = tmp_sa2.unwrap();
 
-    cur = Cursor::new(proto.parts);
-    let tmp_parts = CanonicalDeserialize::deserialize_compressed(cur);
-    if tmp_parts.is_err() {
-        return None;
+    let mut parts = Vec::new();
+    for part in proto.parts {
+        cur = Cursor::new(part);
+        let tmp_part = CanonicalDeserialize::deserialize_compressed(cur);
+        if tmp_part.is_err() {
+            return None;
+        }
+        parts.push(tmp_part.unwrap());
     }
-    let parts = tmp_parts.unwrap();
 
-    cur = Cursor::new(proto.pks);
-    let tmp_pks = CanonicalDeserialize::deserialize_compressed(cur);
-    if tmp_pks.is_err() {
-        return None;
+    let mut pks = Vec::new();
+    for pk in proto.pks {
+        cur = Cursor::new(pk);
+        let tmp_pk = CanonicalDeserialize::deserialize_compressed(cur);
+        if tmp_pk.is_err() {
+            return None;
+        }
+        pks.push(tmp_pk.unwrap());
     }
-    let pks: Vec<PublicKey<E>> = tmp_pks.unwrap();
-
     let tmp_usize = proto.n.try_into();
     if tmp_usize.is_err() {
         return None;

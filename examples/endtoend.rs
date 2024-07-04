@@ -4,6 +4,7 @@ use ark_bls12_381::{Bls12_381, G2Affine};
 use ark_ec::{bls12::Bls12, pairing::Pairing};
 use ark_poly::univariate::DensePolynomial;
 use ark_std::{rand::Rng, Zero};
+use generic_array::typenum::PartialDiv;
 use rand::rngs::OsRng;
 use silent_threshold::{
     decryption::agg_dec, encryption::encrypt, kzg::KZG10, setup::{AggregateKey, PublicKey, SecretKey}, utils::lagrange_poly
@@ -27,7 +28,7 @@ struct G2Point {
 
 fn main() {
     let mut rng = OsRng;
-    let n = 1 << 10; // actually n-1 total parties. one party is a dummy party that is always true
+    let n = 1 << 5; // actually n-1 total parties. one party is a dummy party that is always true
     let t: usize = 9;
     debug_assert!(t < n);
 
@@ -75,14 +76,22 @@ fn main() {
     println!("{}", ct.sa2 == q);
     // compute partial decryptions
     let mut partial_decryptions: Vec<G2> = Vec::new();
+    let mut rr = Vec::new();
     for i in 0..t + 1 {
         let tmp = sk[i].partial_decryption(&ct);
+        let mut tmp_1 = Vec::new();
+        tmp.serialize_compressed(&mut tmp_1).unwrap();
+        rr.extend(tmp_1.iter());
         println!("tmp: {}", sk[i].sk);
         partial_decryptions.push(tmp);
     }
     for _ in t + 1..n {
         partial_decryptions.push(G2::zero());
     }
+
+    let mut writer = Vec::new();
+    partial_decryptions.serialize_compressed(&mut writer).unwrap();
+    println!("{}", hex::encode(&writer) == hex::encode(&rr));
 
     // compute the decryption key
     let mut selector: Vec<bool> = Vec::new();

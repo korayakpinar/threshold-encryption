@@ -59,10 +59,10 @@ pub struct DecryptParams {
 pub struct DecryptParamsProto {
     #[prost(bytes, tag="1")]
     pub enc: Vec<u8>,
-    #[prost(bytes, tag="2")]
-    pub pks: Vec<u8>,
-    #[prost(bytes, tag="3")]
-    pub parts: Vec<u8>,
+    #[prost(bytes, repeated, tag="2")]
+    pub pks: Vec<Vec<u8>>,
+    #[prost(bytes, repeated, tag="3")]
+    pub parts: Vec<Vec<u8>>,
     #[prost(bytes, tag="4")]
     pub sa1: Vec<u8>,
     #[prost(bytes, tag="5")]
