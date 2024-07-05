@@ -16,12 +16,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Build server
-      run: cargo build --release
     - name: Set up python
       run: |
         python3 -m venv tests/venv
-        source venv/bin/activate
+        source tests/venv/bin/activate
         pip install -r tests/requirements.txt
         deactivate
     - name: Set up files
