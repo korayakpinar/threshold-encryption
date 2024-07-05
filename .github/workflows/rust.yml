@@ -1,0 +1,32 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "dev" ]
+  pull_request:
+    branches: [ "dev" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build server
+      run: cargo build --release
+    - name: Set up python
+      run: |
+        python3 -m venv tests/venv
+        source venv/bin/activate
+        pip install -r tests/requirements.txt
+        deactivate
+    - name: Set up files
+      run: cargo run --example main
+    - name: Run tests
+      run: |
+        chmod +x run_test.sh
+        ./run_test.sh
