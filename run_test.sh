@@ -1,6 +1,5 @@
 #!/bin/bash
 cargo run --example main
-cp tests/sks/24 ~/.sk
 cargo run &
 sleep 15
 cd tests
