@@ -1,11 +1,12 @@
 #![allow(non_snake_case, dead_code, unused_variables, unused_imports)]
-use std::{fs::File, io::Cursor, time::{Duration, Instant}};
+use std::{env, fs::File, io::Cursor, time::{Duration, Instant}};
 
+use actix_web::body::MessageBody;
 use ark_poly::univariate::DensePolynomial;
 use ark_serialize::Read;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use hex;
+use hex::{self, ToHex};
 
 use ark_bls12_381::{Bls12_381, G1Affine, G2Affine};
 use ark_ec::{bls12::Bls12, pairing::Pairing};
@@ -28,6 +29,7 @@ type G2 = <E as Pairing>::G2;
 type UniPoly381 = DensePolynomial<<E as Pairing>::ScalarField>;
 type Aes256Cbc = Cbc<Aes256, Pkcs7>;
 
+use std::io::prelude::*;
 use ark_serialize::*;
 
 
@@ -95,17 +97,17 @@ fn convert_hex_to_g2(g2_powers: &Vec<String>) -> Vec<G2Affine> {
 }
 
 fn main() {
-    //let mut file = File::open("transcript.json").unwrap();
+    let mut file = File::open("transcript.json").unwrap();
 
-    //let mut contents: String = String::new();
-    //file.read_to_string(&mut contents).unwrap();
+    let mut contents: String = String::new();
+    file.read_to_string(&mut contents).unwrap();
 
-    //println!("size: {}", contents.len());
-    //let json: KZG = serde_json::from_str::<KZG>(&mut contents).unwrap().into();
-    //println!("numG1Powers: {}", json.transcripts[3].numG1Powers);
+    println!("size: {}", contents.len());
+    let json: KZG = serde_json::from_str::<KZG>(&mut contents).unwrap().into();
+    println!("numG1Powers: {}", json.transcripts[3].numG1Powers);
 
-    //let powers_of_g = convert_hex_to_g1(&json.transcripts[3].powersOfTau.G1Powers);
-    //let powers_of_h = convert_hex_to_g2(&json.transcripts[3].powersOfTau.G2Powers);
+    let powers_of_g = convert_hex_to_g1(&json.transcripts[3].powersOfTau.G1Powers);
+    let powers_of_h = convert_hex_to_g2(&json.transcripts[3].powersOfTau.G2Powers);
 
     //let q = "924530e2fdf93bd252309252ebc5d333345369748375e6a1d2c83215c1a6db770a79e72cf5ef568d773725c9230dcd13";
     //let y = hex::decode(q).unwrap();
@@ -114,12 +116,12 @@ fn main() {
     //println!("{}", z.is_ok());
 
     let mut rng = OsRng;
-    let n = 12;
+    let n = 32;
     
-    let t: usize = 2;
-    // let params = UniversalParams { powers_of_g, powers_of_h };
+    let t: usize = 12;
+    let params = UniversalParams { powers_of_g, powers_of_h };
     
-    let params = KZG10::<E, UniPoly381>::setup(n, &mut rng).unwrap();
+    // let params = KZG10::<E, UniPoly381>::setup(n, &mut rng).unwrap();
 
     let mut sk: Vec<SecretKey<E>> = Vec::new();
     let mut pk: Vec<PublicKey<E>> = Vec::new();
@@ -144,6 +146,20 @@ fn main() {
         pk.push(sk[i].get_pk(i, &params, n, &lagrange_polys))
     }
     println!("");
+
+    for i in 0..32 {
+        let mut wr = Vec::new();
+        
+        pk[i].serialize_compressed(&mut wr).unwrap();
+        let mut f = File::create(format!("tests/pks/{}", i)).unwrap();
+        f.write_all(&wr).unwrap();
+
+        wr.clear();
+
+        sk[i].serialize_compressed(&mut wr).unwrap();
+        let mut s = File::create(format!("tests/sks/{}", i)).unwrap();
+        s.write_all(&wr).unwrap();
+    }
 
     println!("key generation: {:#?}", Duration::from(start.elapsed()));
 /*
@@ -170,7 +186,66 @@ fn main() {
 
     println!("Encrypted ciphertext: {:?}", ct.enc_key.to_string());
 
+    let mut wr = Vec::new();
+    let mut f = File::create("tests/sa1").unwrap();
+    ct.sa1.serialize_compressed(&mut wr).unwrap();
+    f.write_all(&wr).unwrap();
+
+    wr.clear();
+    drop(f);
+
+    let mut f = File::create("tests/sa2").unwrap();
+    ct.sa2.serialize_compressed(&mut wr).unwrap();
+    f.write_all(&wr).unwrap();
+
+    wr.clear();
+    drop(f);
+
+    let mut wr = Vec::new();
+    let mut f = File::create("tests/gamma_g2").unwrap();
+    ct.gamma_g2.serialize_compressed(&mut wr).unwrap();
+    f.write_all(&wr).unwrap();
+    
+    wr.clear();
+    drop(f);
     // compute partial decryptions
+
+    for i in 0..n {
+        let mut f = File::create(format!("tests/parts/{}", i)).unwrap();
+        let mut wr = Vec::new();
+        sk[i].partial_decryption(&ct).serialize_compressed(&mut wr).unwrap();
+        f.write_all(&wr).unwrap();
+        wr.clear()
+    }
+
+    let mut f_1 = File::open("tests/parts/2").unwrap();
+    let mut f_2 = File::open("tests/gamma_g2").unwrap();
+    let mut f_3 = File::open("tests/sks/2").unwrap();
+    let mut f_4 = File::open("tests/sa2").unwrap();
+
+    let mut q = Vec::new();
+    f_1.read_to_end(&mut q).unwrap();
+    let mut cur = Cursor::new(&mut q);
+    let p: G2 = CanonicalDeserialize::deserialize_compressed(cur).unwrap();
+    
+    q = Vec::new();
+    f_2.read_to_end(&mut q).unwrap();
+    cur = Cursor::new(&mut q);
+    let g: G2 = CanonicalDeserialize::deserialize_compressed(cur).unwrap();
+
+    q = Vec::new();
+    f_3.read_to_end(&mut q).unwrap();
+    cur = Cursor::new(&mut q);
+    let s: SecretKey<E> = CanonicalDeserialize::deserialize_compressed(cur).unwrap();
+
+    q = Vec::new();
+    f_4.read_to_end(&mut q).unwrap();
+    cur = Cursor::new(&mut q);
+    let v: [G2; 6] = CanonicalDeserialize::deserialize_compressed(cur).unwrap();
+
+    println!("{}", ct.sa2 == v);
+
+    println!("{}", p == (g * s.sk));
 
     let mut partial_decryptions: Vec<G2> = Vec::new();
     start = Instant::now();
@@ -214,6 +289,9 @@ fn main() {
         let iv = &mut [0u8; 16]; // In practice, use a secure random IV
         rng.fill(iv);
 
+        let mut f = File::create("tests/iv").unwrap();
+        f.write_all(iv).unwrap();
+
         println!("IV: {:?}", iv.to_vec());
 
         // Create AES-256-CBC cipher for encryption and decryption
@@ -223,6 +301,9 @@ fn main() {
         // Encrypt the plaintext
         let ciphertext = cipher_enc.encrypt_vec(plaintext);
         println!("Encrypted message: {:?}", ciphertext);
+
+        let mut f = File::create("tests/enc").unwrap();
+        f.write_all(&ciphertext).unwrap();
 
         // Decrypt the ciphertext
         let decrypted_ciphertext = cipher_dec.decrypt_vec(&ciphertext).unwrap();

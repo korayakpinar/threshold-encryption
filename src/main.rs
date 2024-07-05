@@ -1,5 +1,5 @@
+#![allow(deprecated)]
 use actix_web::{middleware, web, App, HttpServer};
-use ark_ec::pairing::Pairing;
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::Read;
 use silent_threshold::kzg::UniversalParams;
@@ -32,13 +32,11 @@ async fn main() -> std::io::Result<()> {
 
     let kzg_setup: UniversalParams<E> = UniversalParams { powers_of_g, powers_of_h };
 
-    let mut file = File::open("~/.sk").expect("Can't open the file!");
-    let mut contents: String = String::new();
-    file.read_to_string(&mut contents).expect("Can't read the file!");
-    let mut bytes: Vec<u8> = hex::decode(&contents).expect("Can't decode hex"); // TODO: Fix this
-    let mut cursor = Cursor::new(&mut bytes);
-    let deserialized: <E as Pairing>::ScalarField = CanonicalDeserialize::deserialize_compressed(&mut cursor).expect("Unable to deserialize the data!");
-    let sk: SecretKey<E> = SecretKey { sk: deserialized };
+    let mut file = File::open(format!("{}/.sk", std::env::home_dir().unwrap().display())).expect("Can't open the file!");
+    let mut contents = Vec::new();
+    file.read_to_end(&mut contents).expect("Can't read the file!");
+    let mut cursor = Cursor::new(contents);
+    let sk: SecretKey<E> = CanonicalDeserialize::deserialize_compressed(&mut cursor).expect("Unable to deserialize the data!");
 
     let data = web::Data::new(Data {kzg_setup, sk});
 

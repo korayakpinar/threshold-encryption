@@ -1,19 +1,13 @@
 use std::ops::Mul;
 
 use crate::{kzg::UniversalParams, setup::AggregateKey};
-use ark_bls12_381::Bls12_381;
-use ark_ec::bls12::Bls12;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     Group,
 };
-use ark_poly::univariate::DensePolynomial;
 use ark_serialize::*;
 use ark_std::{UniformRand, Zero};
 use rand::rngs::OsRng;
-
-type S = Bls12_381;
-type UniPoly381 = DensePolynomial<<S as Pairing>::ScalarField>;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct Ciphertext<E: Pairing> {
