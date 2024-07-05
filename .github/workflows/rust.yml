@@ -22,6 +22,8 @@ jobs:
         source tests/venv/bin/activate
         pip install -r tests/requirements.txt
         deactivate
+    - name: Get transcript.json
+      run: wget https://github.com/ethereum/kzg-ceremony/raw/main/transcript.json
     - name: Set up files
       run: cargo run --example main
     - name: Run tests
