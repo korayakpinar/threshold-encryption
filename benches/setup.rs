@@ -1,7 +1,7 @@
-use ark_ec::pairing::Pairing;
+use ark_ec::{bls12::Bls12, pairing::Pairing};
 use ark_poly::univariate::DensePolynomial;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use silent_threshold::{kzg::KZG10, setup::SecretKey};
+use silent_threshold::{kzg::KZG10, setup::SecretKey, utils::lagrange_poly};
 
 type E = ark_bls12_381::Bls12_381;
 type UniPoly381 = DensePolynomial<<E as Pairing>::ScalarField>;
@@ -16,8 +16,12 @@ fn bench_setup(c: &mut Criterion) {
 
         let sk = SecretKey::<E>::new(&mut rng);
 
+        let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>> = (0..n)
+            .map(|j| lagrange_poly(n, j))
+            .collect();
+
         group.bench_with_input(BenchmarkId::from_parameter(n), &params, |b, inp| {
-            b.iter(|| sk.get_pk(0, &inp, n));
+            b.iter(|| sk.get_pk(0, &inp, n, &lagrange_polys));
         });
     }
 

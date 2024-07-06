@@ -1,11 +1,11 @@
-use ark_ec::pairing::Pairing;
+use ark_ec::{bls12::Bls12, pairing::Pairing};
 use ark_poly::univariate::DensePolynomial;
 use ark_std::Zero;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use silent_threshold::{
     encryption::encrypt,
     kzg::KZG10,
-    setup::{AggregateKey, PublicKey, SecretKey},
+    setup::{AggregateKey, PublicKey, SecretKey}, utils::lagrange_poly,
 };
 
 type E = ark_bls12_381::Bls12_381;
@@ -25,10 +25,14 @@ fn bench_decrypt(c: &mut Criterion) {
         let mut sk: Vec<SecretKey<E>> = Vec::new();
         let mut pk: Vec<PublicKey<E>> = Vec::new();
 
+        let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>> = (0..n)
+            .map(|j| lagrange_poly(n, j))
+            .collect();
+
         // create the dummy party's keys
         sk.push(SecretKey::<E>::new(&mut rng));
         sk[0].nullify();
-        pk.push(sk[0].get_pk(0, &params, n));
+        pk.push(sk[0].get_pk(0, &params, n, &lagrange_polys));
 
         // for i in 1..n {
         //     sk.push(SecretKey::<E>::new(&mut rng));
@@ -36,7 +40,7 @@ fn bench_decrypt(c: &mut Criterion) {
         // }
 
         sk.push(SecretKey::<E>::new(&mut rng));
-        pk.push(sk[1].get_pk(1, &params, n));
+        pk.push(sk[1].get_pk(1, &params, n, &lagrange_polys));
 
         for _ in 2..n {
             sk.push(sk[1].clone());
@@ -69,7 +73,7 @@ fn bench_decrypt(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::from_parameter(n),
             &(partial_decryptions, ct, selector, agg_key, params),
-            |b, inp| {
+            |_, _| {
                 //b.iter(|| agg_dec(&inp.0, &inp.1, &inp.2, &inp.3, &inp.4));
             },
         );

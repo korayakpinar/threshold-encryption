@@ -101,7 +101,7 @@ mod tests {
     use super::*;
     use crate::{
         kzg::KZG10,
-        setup::{PublicKey, SecretKey},
+        setup::{PublicKey, SecretKey}, utils::lagrange_poly,
     };
     use ark_poly::univariate::DensePolynomial;
 
@@ -119,9 +119,13 @@ mod tests {
         let mut sk: Vec<SecretKey<E>> = Vec::new();
         let mut pk: Vec<PublicKey<E>> = Vec::new();
 
+        let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as ark_ec::pairing::Pairing>::ScalarField>> = (0..n)
+            .map(|j| lagrange_poly(n, j))
+            .collect();
+
         for i in 0..n {
             sk.push(SecretKey::<E>::new(&mut rng));
-            pk.push(sk[i].get_pk(0, &params, n))
+            pk.push(sk[i].get_pk(0, &params, n, &lagrange_polys))
         }
 
         let ak = AggregateKey::<E>::new(pk, &params);

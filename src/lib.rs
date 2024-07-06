@@ -3,3 +3,4 @@ pub mod encryption;
 pub mod kzg;
 pub mod setup;
 pub mod utils;
+pub mod api;

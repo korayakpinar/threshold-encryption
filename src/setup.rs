@@ -1,6 +1,4 @@
-use ark_bls12_381::Bls12_381;
 use ark_ec::pairing::PairingOutput;
-// use crate::utils::{lagrange_coefficients, transpose};
 use ark_ec::{pairing::Pairing, Group};
 use ark_poly::DenseUVPolynomial;
 use ark_poly::{domain::EvaluationDomain, univariate::DensePolynomial, Radix2EvaluationDomain};
@@ -10,21 +8,10 @@ use std::ops::{Mul, Sub};
 
 use crate::encryption::Ciphertext;
 use crate::kzg::{UniversalParams, KZG10};
-use crate::utils::lagrange_poly;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct SecretKey<E: Pairing> {
     pub sk: E::ScalarField,
-}
-
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
-pub struct DecryptParams {
-    pub enc: Vec<u8>,
-    pub sa1: [<Bls12_381 as Pairing>::G1; 2],
-    pub sa2: [<Bls12_381 as Pairing>::G2; 6],
-    pub iv: Vec<u8>,
-    pub n: usize,
-    pub t: usize
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
@@ -79,21 +66,19 @@ impl<E: Pairing> SecretKey<E> {
         self.sk = E::ScalarField::one()
     }
 
-    pub fn get_pk(&self, id: usize, params: &UniversalParams<E>, n: usize) -> PublicKey<E> {
-        // TODO: This runs in quadratic time because we are not preprocessing the Li's
-        // Fix this.
+    pub fn get_pk(&self, id: usize, params: &UniversalParams<E>, n: usize, lagrange_polys: &Vec<DensePolynomial<E::ScalarField>>) -> PublicKey<E> {
         let domain = Radix2EvaluationDomain::<E::ScalarField>::new(n).unwrap();
 
-        let li = lagrange_poly(n, id);
+        let li = &lagrange_polys[id];
 
         let mut sk_li_by_z = vec![];
         for j in 0..n {
             let num = if id == j {
-                li.clone().mul(&li).sub(&li)
+                li.mul(li).sub(li)
             } else {
                 //cross-terms
-                let l_j = lagrange_poly(n, j);
-                l_j.mul(&li)
+                //let l_j = lagrange_polys[j].clone();
+                lagrange_polys[j].mul(li)
             };
 
             let f = num.divide_by_vanishing_poly(domain).unwrap().0;
@@ -112,7 +97,7 @@ impl<E: Pairing> SecretKey<E> {
             .expect("commitment failed")
             .into();
 
-        let mut f = &li * self.sk;
+        let mut f = li * self.sk;
         let sk_li = KZG10::commit_g1(params, &f)
             .expect("commitment failed")
             .into();
@@ -171,6 +156,10 @@ impl<E: Pairing> AggregateKey<E> {
 
 #[cfg(test)]
 mod tests {
+    use ark_ec::bls12::Bls12;
+
+    use crate::utils::lagrange_poly;
+
     use super::*;
 
     type E = ark_bls12_381::Bls12_381;
@@ -182,12 +171,16 @@ mod tests {
         let n = 4;
         let params = KZG10::<E, UniPoly381>::setup(n, &mut rng).unwrap();
 
+        let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>> = (0..n)
+            .map(|j| lagrange_poly(n, j))
+            .collect();
+
         let mut sk: Vec<SecretKey<E>> = Vec::new();
         let mut pk: Vec<PublicKey<E>> = Vec::new();
 
         for i in 0..n {
             sk.push(SecretKey::<E>::new(&mut rng));
-            pk.push(sk[i].get_pk(0, &params, n))
+            pk.push(sk[i].get_pk(0, &params, n, &lagrange_polys))
         }
 
         let _ak = AggregateKey::<E>::new(pk, &params);

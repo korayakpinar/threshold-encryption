@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+message VerifyPartProto {
+    bytes pk = 1;
+    bytes gamma_g2 = 2;
+    bytes part_dec = 3;
+}
+
+message DecryptParamsProto {
+    bytes enc = 1;
+    repeated bytes pks = 2;
+    repeated bytes parts = 3;
+    bytes sa1 = 4;
+    bytes sa2 = 5;
+    bytes iv = 6;
+    uint64 t = 7;
+    uint64 n = 8;
+}
+
+message GammaG2Proto {
+    bytes gamma_g2 = 1;
+}
+
+message ResultProto {
+    bytes result = 1;
+}

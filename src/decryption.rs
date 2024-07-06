@@ -1,6 +1,6 @@
+use ark_bls12_381::Bls12_381;
 use ark_ec::{
-    pairing::{Pairing, PairingOutput},
-    VariableBaseMSM,
+    pairing::{Pairing, PairingOutput}, VariableBaseMSM
 };
 use ark_poly::{
     univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, Polynomial,
@@ -11,7 +11,7 @@ use std::ops::Div;
 
 use crate::{
     kzg::{UniversalParams, KZG10},
-    setup::AggregateKey,
+    setup::{AggregateKey, PublicKey},
     utils::interp_mostly_zero,
 };
 
@@ -146,14 +146,19 @@ pub fn agg_dec<E: Pairing>(
     enc_key
 }
 
+pub fn part_verify(gamma_g2: <Bls12_381 as Pairing>::G2, pk: PublicKey<Bls12_381>, g1: <Bls12_381 as Pairing>::G1, part_dec: <Bls12_381 as Pairing>::G2) -> bool {
+    Bls12_381::pairing(pk.bls_pk, gamma_g2) == Bls12_381::pairing(g1, part_dec)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
         encryption::encrypt,
         kzg::KZG10,
-        setup::{PublicKey, SecretKey},
+        setup::{PublicKey, SecretKey}, utils::lagrange_poly,
     };
+    use ark_ec::bls12::Bls12;
     use ark_poly::univariate::DensePolynomial;
 
     type E = ark_bls12_381::Bls12_381;
@@ -163,8 +168,8 @@ mod tests {
     #[test]
     fn test_decryption() {
         let mut rng = ark_std::test_rng();
-        let n = 1 << 4; // actually n-1 total parties. one party is a dummy party that is always true
-        let t: usize = n / 2;
+        let n = 16; // actually n-1 total parties. one party is a dummy party that is always true
+        let t: usize = 15;
         debug_assert!(t < n);
 
         let params = KZG10::<E, UniPoly381>::setup(n, &mut rng).unwrap();
@@ -172,14 +177,18 @@ mod tests {
         let mut sk: Vec<SecretKey<E>> = Vec::new();
         let mut pk: Vec<PublicKey<E>> = Vec::new();
 
+        let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as ark_ec::pairing::Pairing>::ScalarField>> = (0..n)
+            .map(|j| lagrange_poly(n, j))
+            .collect();
+
         // create the dummy party's keys
         sk.push(SecretKey::<E>::new(&mut rng));
         sk[0].nullify();
-        pk.push(sk[0].get_pk(0, &params, n));
+        pk.push(sk[0].get_pk(0, &params, n, &lagrange_polys));
 
         for i in 1..n {
             sk.push(SecretKey::<E>::new(&mut rng));
-            pk.push(sk[i].get_pk(i, &params, n))
+            pk.push(sk[i].get_pk(i, &params, n, &lagrange_polys))
         }
 
         let agg_key = AggregateKey::<E>::new(pk, &params);
