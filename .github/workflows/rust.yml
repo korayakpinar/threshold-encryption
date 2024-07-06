@@ -24,12 +24,11 @@ jobs:
         deactivate
     - name: Get transcript.json
       run: wget https://github.com/ethereum/kzg-ceremony/raw/main/transcript.json
-    - name: Set up files
+    - name: Set up directories
       run: |
         mkdir tests/pks
         mkdir tests/sks
         mkdir tests/parts
-        cargo run --example main
     - name: Run tests
       run: |
         chmod +x run_test.sh

@@ -3,3 +3,12 @@
 transcript.json
 venv/
 __pycache__/
+
+parts/
+pks/
+sks/
+enc
+gamma_g2
+iv
+sa1
+sa2
