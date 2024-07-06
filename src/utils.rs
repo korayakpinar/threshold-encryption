@@ -84,7 +84,7 @@ pub fn convert_hex_to_g1(g1_powers: &Vec<String>) -> Vec<G1Affine> {
         let mut cur = Cursor::new(g1_vec);
         let g1 = G1Affine::deserialize_compressed(&mut cur).unwrap();
         g1_powers_decompressed.push(g1);
-        print!("{}/{}\t\r", j, len);
+        // print!("{}/{}\t\r", j, len);
         // println!("{:#?}", g1);
         j += 1;
     }
@@ -102,9 +102,9 @@ pub fn convert_hex_to_g2(g2_powers: &Vec<String>) -> Vec<G2Affine> {
         let mut cur = Cursor::new(g2_powers);
         let g2 = G2Affine::deserialize_compressed(&mut cur).unwrap();
         g2_powers_decompressed.push(g2);
-        print!("{}/{}\t\r", j, len);
-        j += 1;
+        // print!("{}/{}\t\r", j, len);
         // println!("{:#?}", g2);
+        j += 1;
     }
     print!("\n");
 
