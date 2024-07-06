@@ -1,5 +1,8 @@
 from typing import List, ByteString
+import subprocess
 import random
+import time
+import os
 
 import requests
 import message_pb2
@@ -27,7 +30,6 @@ def verifypart_test(pk: ByteString, gamma_g2: ByteString, part_dec: ByteString) 
 
     resp = requests.post("http://127.0.0.1:8080/verifydec", headers={'Content-Type': 'application/protobuf'}, data=m.SerializeToString())
     return resp.status_code == 200
-    
 
 
 def decrypt_test(
@@ -95,8 +97,13 @@ def main() -> None:
     with open("iv", "rb") as f:
         iv = f.read()
 
+    os.chdir("..")
+    proc = subprocess.Popen(["cargo", "run"])
+    time.sleep(30)
+    os.chdir("tests")
+
     assert(partdec_test(parts, gamma_g2) == True)
-    
+
     for i in range(n):
         assert(verifypart_test(pks[i], gamma_g2, parts[i]) == True)
 
