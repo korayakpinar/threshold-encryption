@@ -45,7 +45,7 @@ pub async fn decrypt_part(config: HttpRequest, data: ProtoBuf<GammaG2Proto>) -> 
 pub async fn decrypt(config: HttpRequest, data: ProtoBuf<DecryptParamsProto>) -> HttpResponse {
     let datum = config.app_data::<Data>().unwrap();
     let kzg_setup = datum.clone().kzg_setup;
-    log::info!("params_res");
+
     let params_res = deserialize_decrypt_params(data.0);
     if params_res.is_none() {
         log::error!("can't deserialize decrypt params");
