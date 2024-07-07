@@ -98,10 +98,10 @@ def main() -> None:
     with open("iv", "rb") as f:
         iv = f.read()
 
-    #os.chdir("..")
-    #proc = subprocess.Popen(["cargo", "run"])
-    #time.sleep(30)
-    #os.chdir("tests")
+    os.chdir("..")
+    proc = subprocess.Popen(["cargo", "run"])
+    time.sleep(45)
+    os.chdir("tests")
 
     assert(partdec_test(parts, gamma_g2) == True)
 

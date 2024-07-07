@@ -230,15 +230,7 @@ fn main() {
         partial_decryptions.push(G2::zero());
     }
 
-    println!("{:#?}", partial_decryptions);
-
-    println!("{}", ct.enc_key.to_string());
-
     println!("partial decryptions: {:#?}", Duration::from(start.elapsed()));
-
-    let mut abc = Vec::new();
-    partial_decryptions.serialize_compressed(&mut abc).unwrap();
-    println!("{}", hex::encode(abc));
 
     // compute the decryption key
     let mut selector: Vec<bool> = Vec::new();
