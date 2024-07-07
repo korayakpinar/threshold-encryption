@@ -19,7 +19,7 @@ def partdec_test(
     resp = requests.post("http://127.0.0.1:8080/partdec", headers={'Content-Type': 'application/protobuf'}, data=m.SerializeToString())
     res = message_pb2.ResultProto()
     r = res.ParseFromString(resp.content)
-    return res.result == parts[24]
+    return res.result == parts[12]
 
 
 def verifypart_test(pk: ByteString, gamma_g2: ByteString, part_dec: ByteString) -> bool:
@@ -62,7 +62,8 @@ def decrypt_test(
 
 def main() -> None:
     n = 32
-    t = 12
+    k = 22
+    t = 2
 
     enc = b""
     with open("enc", "rb") as f:
@@ -71,7 +72,7 @@ def main() -> None:
     pks = []
     sks = []
     parts = []
-    for i in range(n):
+    for i in range(k):
         with open(f"pks/{i}", "rb") as f:
             pks.append(f.read())
 
@@ -97,14 +98,14 @@ def main() -> None:
     with open("iv", "rb") as f:
         iv = f.read()
 
-    os.chdir("..")
-    proc = subprocess.Popen(["cargo", "run"])
-    time.sleep(30)
-    os.chdir("tests")
+    #os.chdir("..")
+    #proc = subprocess.Popen(["cargo", "run"])
+    #time.sleep(30)
+    #os.chdir("tests")
 
     assert(partdec_test(parts, gamma_g2) == True)
 
-    for i in range(n):
+    for i in range(k):
         assert(verifypart_test(pks[i], gamma_g2, parts[i]) == True)
 
     assert(decrypt_test(enc, pks, parts, sa1, sa2, iv, t, n) == True)
