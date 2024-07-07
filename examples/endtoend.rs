@@ -57,7 +57,7 @@ fn main() {
 
     //println!("size of sk[0], {}", std::mem::size_of_val(&sk[2]));
     
-    let agg_key = AggregateKey::<E>::new(pk, &params);
+    let agg_key = AggregateKey::<E>::new(pk, n, &params);
     let ct = encrypt::<E>(&agg_key, t, &params);
 
     println!("Encrypted ciphertext: {:?}", ct.enc_key.to_string());
@@ -101,7 +101,7 @@ fn main() {
         selector.push(false);
     }
 
-    let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, t, &selector, &agg_key, &params);
+    let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, t, n, &selector, &agg_key, &params);
     println!("Gamma_G2: {:#?}", ct.gamma_g2);
     let mut s1: Vec<u8> = Vec::new();
     ct.gamma_g2.serialize_compressed(&mut s1).expect("Can't unwrap");

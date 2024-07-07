@@ -116,9 +116,10 @@ fn main() {
     //println!("{}", z.is_ok());
 
     let mut rng = OsRng;
-    let n = 32;
-    
-    let t: usize = 12;
+    let n = 1 << 5; // actually n-1 total parties. one party is a dummy party that is always true
+    let k = 22;
+    let t: usize = 2;
+    debug_assert!(t < n);
     let params = UniversalParams { powers_of_g, powers_of_h };
     
     // let params = KZG10::<E, UniPoly381>::setup(n, &mut rng).unwrap();
@@ -140,14 +141,14 @@ fn main() {
 
     let mut start = Instant::now();
 
-    for i in 1..n {
-        println!("Key {}/{}", i, n);
+    for i in 1..k {
+        println!("Key {}/{}", i, k);
         sk.push(SecretKey::<E>::new(&mut rng));
         pk.push(sk[i].get_pk(i, &params, n, &lagrange_polys))
     }
     println!("");
 
-    for i in 0..32 {
+    for i in 0..k {
         let mut wr = Vec::new();
         
         pk[i].serialize_compressed(&mut wr).unwrap();
@@ -179,7 +180,7 @@ fn main() {
 
     start = Instant::now();
 
-    let agg_key = AggregateKey::<E>::new(pk.clone(), &params);
+    let agg_key = AggregateKey::<E>::new(pk.clone(), n, &params);
     let ct = encrypt::<E>(&agg_key, t, &params);
 
     println!("encryption: {:#?}", Duration::from(start.elapsed()));
@@ -208,9 +209,8 @@ fn main() {
     
     wr.clear();
     drop(f);
-    // compute partial decryptions
 
-    for i in 0..n {
+    for i in 0..k {
         let mut f = File::create(format!("tests/parts/{}", i)).unwrap();
         let mut wr = Vec::new();
         sk[i].partial_decryption(&ct).serialize_compressed(&mut wr).unwrap();
@@ -251,8 +251,8 @@ fn main() {
     start = Instant::now();
     for i in 0..t + 1 {
         let tmp = sk[i].partial_decryption(&ct);
-        // let x = part_verify(ct.gamma_g2, (pk.clone()).get(i).unwrap().to_owned(), params.powers_of_g[0].into(), tmp.clone());
-        // println!("part_verify = {}", x);
+        let x = part_verify(ct.gamma_g2, (pk.clone()).get(i).unwrap().to_owned(), params.powers_of_g[0].into(), tmp.clone());
+        println!("part_verify = {}", x);
         partial_decryptions.push(tmp);
     }
     for _ in t + 1..n {
@@ -269,8 +269,9 @@ fn main() {
         selector.push(false);
     }
     start = Instant::now();
-    let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, t, &selector, &agg_key, &params);
+    let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, t, n, &selector, &agg_key, &params);
     println!("decryption: {:#?}", Duration::from(start.elapsed()));
+
     if ct.enc_key == _dec_key {
 
         // Hash the `enc_key` using SHA-256

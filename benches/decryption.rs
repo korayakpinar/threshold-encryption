@@ -49,7 +49,7 @@ fn bench_decrypt(c: &mut Criterion) {
 
         println!("Setup keys!");
 
-        let agg_key = AggregateKey::<E>::new(pk, &params);
+        let agg_key = AggregateKey::<E>::new(pk, n, &params);
         let ct = encrypt::<E>(&agg_key, t, &params);
 
         // compute partial decryptions

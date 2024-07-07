@@ -61,9 +61,9 @@ pub async fn decrypt(config: HttpRequest, data: ProtoBuf<DecryptParamsProto>) ->
         selector.push(false);
     }
     
-    let aggregated = AggregateKey::<E>::new(params.pks.clone(), &kzg_setup);
+    let aggregated = AggregateKey::<E>::new(params.pks.clone(), params.n, &kzg_setup);
 
-    let key = agg_dec(&params.parts, &params.sa1, &params.sa2, params.t, &selector, &aggregated, &kzg_setup);
+    let key = agg_dec(&params.parts, &params.sa1, &params.sa2, params.t, params.n, &selector, &aggregated, &kzg_setup);
 
     let mut hasher = Sha256::new();
     hasher.update(key.to_string().as_bytes());
