@@ -2,6 +2,7 @@ use actix_protobuf::{ProtoBuf, ProtoBufResponseBuilder};
 use actix_web::{HttpRequest, HttpResponse};
 
 use ark_serialize::*;
+use ark_std::Zero;
 
 use sha2::{Sha256, Digest};
 use block_modes::BlockMode;
@@ -60,10 +61,20 @@ pub async fn decrypt(config: HttpRequest, data: ProtoBuf<DecryptParamsProto>) ->
     for _ in params.t + 1..params.n {
         selector.push(false);
     }
-    
-    let aggregated = AggregateKey::<E>::new(params.pks.clone(), params.n, &kzg_setup);
 
-    let key = agg_dec(&params.parts, &params.sa1, &params.sa2, params.t, params.n, &selector, &aggregated, &kzg_setup);
+    let mut partial_decryptions: Vec<G2> = Vec::new();
+    for i in 0..params.t + 1 {
+        partial_decryptions.push(params.parts[i]);
+    }
+    for _ in params.t + 1..params.n {
+        partial_decryptions.push(G2::zero());
+    }
+
+    //println!("{:#?}, {:#?}, {:#?}, {}, {}", partial_decryptions, partial_decryptions.len(), params.parts.len(), params.t, params.n);
+
+    let aggregated = AggregateKey::<E>::new(params.pks.clone(), params.n, &kzg_setup);
+    let key = agg_dec(&partial_decryptions, &params.sa1, &params.sa2, params.t, params.n, &selector, &aggregated, &kzg_setup);
+    println!("{}", key.to_string());
 
     let mut hasher = Sha256::new();
     hasher.update(key.to_string().as_bytes());
@@ -81,7 +92,7 @@ pub async fn decrypt(config: HttpRequest, data: ProtoBuf<DecryptParamsProto>) ->
     let decrypted_res = cipher_dec.decrypt_vec(&params.enc);
     if decrypted_res.is_err() {
         log::error!("failed to decrypt the data");
-        return HttpResponse::BadRequest().finish();
+        return HttpResponse::UnavailableForLegalReasons().finish();
     }
     let result = decrypted_res.unwrap();
 

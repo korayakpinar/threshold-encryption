@@ -215,37 +215,8 @@ fn main() {
         let mut wr = Vec::new();
         sk[i].partial_decryption(&ct).serialize_compressed(&mut wr).unwrap();
         f.write_all(&wr).unwrap();
-        wr.clear()
+        wr.clear();
     }
-
-    let mut f_1 = File::open("tests/parts/2").unwrap();
-    let mut f_2 = File::open("tests/gamma_g2").unwrap();
-    let mut f_3 = File::open("tests/sks/2").unwrap();
-    let mut f_4 = File::open("tests/sa2").unwrap();
-
-    let mut q = Vec::new();
-    f_1.read_to_end(&mut q).unwrap();
-    let mut cur = Cursor::new(&mut q);
-    let p: G2 = CanonicalDeserialize::deserialize_compressed(cur).unwrap();
-    
-    q = Vec::new();
-    f_2.read_to_end(&mut q).unwrap();
-    cur = Cursor::new(&mut q);
-    let g: G2 = CanonicalDeserialize::deserialize_compressed(cur).unwrap();
-
-    q = Vec::new();
-    f_3.read_to_end(&mut q).unwrap();
-    cur = Cursor::new(&mut q);
-    let s: SecretKey<E> = CanonicalDeserialize::deserialize_compressed(cur).unwrap();
-
-    q = Vec::new();
-    f_4.read_to_end(&mut q).unwrap();
-    cur = Cursor::new(&mut q);
-    let v: [G2; 6] = CanonicalDeserialize::deserialize_compressed(cur).unwrap();
-
-    println!("{}", ct.sa2 == v);
-
-    println!("{}", p == (g * s.sk));
 
     let mut partial_decryptions: Vec<G2> = Vec::new();
     start = Instant::now();
@@ -258,7 +229,16 @@ fn main() {
     for _ in t + 1..n {
         partial_decryptions.push(G2::zero());
     }
+
+    println!("{:#?}", partial_decryptions);
+
+    println!("{}", ct.enc_key.to_string());
+
     println!("partial decryptions: {:#?}", Duration::from(start.elapsed()));
+
+    let mut abc = Vec::new();
+    partial_decryptions.serialize_compressed(&mut abc).unwrap();
+    println!("{}", hex::encode(abc));
 
     // compute the decryption key
     let mut selector: Vec<bool> = Vec::new();

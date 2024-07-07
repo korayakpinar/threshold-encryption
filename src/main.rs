@@ -32,7 +32,7 @@ async fn main() -> std::io::Result<()> {
 
     let kzg_setup: UniversalParams<E> = UniversalParams { powers_of_g, powers_of_h };
 
-    let mut file = File::open("tests/sks/24").expect("Can't open the file!");
+    let mut file = File::open("tests/sks/12").expect("Can't open the file!");
     let mut contents = Vec::new();
     file.read_to_end(&mut contents).expect("Can't read the file!");
     let mut cursor = Cursor::new(contents);

@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::{fs::File, mem::size_of_val};
 
 use ark_ec::{bls12::Bls12, pairing::Pairing};
 use ark_poly::univariate::DensePolynomial;
@@ -40,7 +40,7 @@ fn main() {
 
     let mut rng = OsRng;
     let n = 1 << 5; // actually n-1 total parties. one party is a dummy party that is always true
-    let k = 22;
+    let k: usize = 22;
     let t: usize = 2;
     debug_assert!(t < n);
 
@@ -69,6 +69,8 @@ fn main() {
     for _ in t + 1..n {
         partial_decryptions.push(G2::zero());
     }
+
+    println!("{}", size_of_val(&partial_decryptions[0]));
 
     // compute the decryption key
     let mut selector: Vec<bool> = Vec::new();
