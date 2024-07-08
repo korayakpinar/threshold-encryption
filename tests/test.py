@@ -103,7 +103,7 @@ def main() -> None:
         iv = f.read()
 
     os.chdir("..")
-    proc = subprocess.Popen(["cargo", "run"])
+    proc = subprocess.Popen(["cargo", "run", "--", "--transcript", "transcript.json", "--bls-key", "tests/sks/12", "--api-port", "8080"])
     time.sleep(45)
     os.chdir("tests")
 
