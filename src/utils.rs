@@ -13,6 +13,7 @@ use ark_serialize::*;
 // 1 at omega^i and 0 elsewhere on domain {omega^i}_{i \in [n]}
 pub fn lagrange_poly<F: FftField>(n: usize, i: usize) -> DensePolynomial<F> {
     debug_assert!(i < n);
+    debug_assert!((n != 0) && ((n & (n - 1)) == 0));
     let mut evals = vec![];
     for j in 0..n {
         let l_of_x: u64 = if i == j { 1 } else { 0 };
@@ -88,7 +89,7 @@ pub fn convert_hex_to_g1(g1_powers: &Vec<String>) -> Vec<G1Affine> {
         // println!("{:#?}", g1);
         j += 1;
     }
-    print!("\n");
+    // print!("\n");
 
     g1_powers_decompressed
 }
@@ -106,7 +107,7 @@ pub fn convert_hex_to_g2(g2_powers: &Vec<String>) -> Vec<G2Affine> {
         // println!("{:#?}", g2);
         j += 1;
     }
-    print!("\n");
+    // print!("\n");
 
     g2_powers_decompressed
 }

@@ -28,7 +28,7 @@ fn bench_encrypt(c: &mut Criterion) {
         pk.push(sk[i].get_pk(0, &params, n, &lagrange_polys))
     }
 
-    let ak = AggregateKey::<E>::new(pk, &params);
+    let ak = AggregateKey::<E>::new(pk, n, &params);
 
     c.bench_function("encrypt", |b| b.iter(|| encrypt::<E>(&ak, t, &params)));
 }

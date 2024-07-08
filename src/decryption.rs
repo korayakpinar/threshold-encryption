@@ -20,11 +20,11 @@ pub fn agg_dec<E: Pairing>(
     sa1: &[E::G1; 2],
     sa2: &[E::G2; 6],
     t: usize,
+    n: usize,
     selector: &[bool],
     agg_key: &AggregateKey<E>,
     params: &UniversalParams<E>,
 ) -> PairingOutput<E> {
-    let n = agg_key.pk.len();
     let domain = Radix2EvaluationDomain::<E::ScalarField>::new(n).unwrap();
     let domain_elements: Vec<E::ScalarField> = domain.elements().collect();
 
@@ -191,7 +191,7 @@ mod tests {
             pk.push(sk[i].get_pk(i, &params, n, &lagrange_polys))
         }
 
-        let agg_key = AggregateKey::<E>::new(pk, &params);
+        let agg_key = AggregateKey::<E>::new(pk, n, &params);
         let ct = encrypt::<E>(&agg_key, t, &params);
 
         // compute partial decryptions
@@ -212,6 +212,6 @@ mod tests {
             selector.push(false);
         }
 
-        let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, ct.t, &selector, &agg_key, &params);
+        let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, ct.t, n, &selector, &agg_key, &params);
     }
 }

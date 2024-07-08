@@ -123,8 +123,7 @@ impl<E: Pairing> SecretKey<E> {
 }
 
 impl<E: Pairing> AggregateKey<E> {
-    pub fn new(pk: Vec<PublicKey<E>>, params: &UniversalParams<E>) -> Self {
-        let n = pk.len();
+    pub fn new(pk: Vec<PublicKey<E>>, n: usize, params: &UniversalParams<E>) -> Self {
         let h_minus1 = params.powers_of_h[0] * (-E::ScalarField::one());
         let z_g2 = params.powers_of_h[n] + h_minus1;
 
@@ -183,6 +182,6 @@ mod tests {
             pk.push(sk[i].get_pk(0, &params, n, &lagrange_polys))
         }
 
-        let _ak = AggregateKey::<E>::new(pk, &params);
+        let _ak = AggregateKey::<E>::new(pk, n, &params);
     }
 }

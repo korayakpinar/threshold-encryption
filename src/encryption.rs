@@ -103,6 +103,7 @@ mod tests {
         kzg::KZG10,
         setup::{PublicKey, SecretKey}, utils::lagrange_poly,
     };
+    use ark_ec::bls12::Bls12;
     use ark_poly::univariate::DensePolynomial;
 
     type E = ark_bls12_381::Bls12_381;
@@ -128,7 +129,7 @@ mod tests {
             pk.push(sk[i].get_pk(0, &params, n, &lagrange_polys))
         }
 
-        let ak = AggregateKey::<E>::new(pk, &params);
+        let ak = AggregateKey::<E>::new(pk, n, &params);
         let ct = encrypt::<E>(&ak, 2, &params);
 
         let mut ct_bytes = Vec::new();
