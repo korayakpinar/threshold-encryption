@@ -12,18 +12,22 @@ def partdec_test(
     parts: List[ByteString],
     gamma_g2: ByteString
 ) -> bool:
-    # set 24 ~/.sk
-    m = message_pb2.GammaG2Proto()
+    # set 12 ~/.sk
+    m = message_pb2.GammaG2Request()
     m.gamma_g2 = gamma_g2
     
     resp = requests.post("http://127.0.0.1:8080/partdec", headers={'Content-Type': 'application/protobuf'}, data=m.SerializeToString())
-    res = message_pb2.ResultProto()
+    res = message_pb2.Response()
     r = res.ParseFromString(resp.content)
     return res.result == parts[12]
 
 
-def verifypart_test(pk: ByteString, gamma_g2: ByteString, part_dec: ByteString) -> bool:
-    m = message_pb2.VerifyPartProto()
+def verifypart_test(
+    pk: ByteString,
+    gamma_g2: ByteString,
+    part_dec: ByteString
+) -> bool:
+    m = message_pb2.VerifyPartRequest()
     m.pk = pk
     m.gamma_g2 = gamma_g2
     m.part_dec = part_dec
@@ -42,7 +46,7 @@ def decrypt_test(
     t: int,
     n: int
 ) -> bool:
-    m = message_pb2.DecryptParamsProto()
+    m = message_pb2.DecryptParamsRequest()
     m.enc = enc
     m.pks[:] = pks
     m.parts[:] = parts
@@ -55,7 +59,7 @@ def decrypt_test(
     decrypted_data = b"Hello, world!"
 
     resp = requests.post("http://127.0.0.1:8080/decrypt", headers={'Content-Type': 'application/protobuf'}, data=m.SerializeToString())
-    res = message_pb2.ResultProto()
+    res = message_pb2.Response()
     r = res.ParseFromString(resp.content)
     return res.result == decrypted_data
 

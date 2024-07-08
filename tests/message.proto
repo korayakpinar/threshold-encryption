@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-message VerifyPartProto {
+message VerifyPartRequest {
     bytes pk = 1;
     bytes gamma_g2 = 2;
     bytes part_dec = 3;
 }
 
-message DecryptParamsProto {
+message DecryptParamsRequest {
     bytes enc = 1;
     repeated bytes pks = 2;
     repeated bytes parts = 3;
@@ -17,10 +17,25 @@ message DecryptParamsProto {
     uint64 n = 8;
 }
 
-message GammaG2Proto {
+message EncryptRequest {
+    bytes msg = 1;
+    repeated bytes pks = 2;
+    uint64 t = 3;
+    uint64 n = 4;
+}
+
+message EncryptResponse {
+    bytes enc = 1;
+    bytes sa1 = 2;
+    bytes sa2 = 3;
+    bytes iv = 4;
+    bytes gamma_g2 = 5;
+}
+
+message GammaG2Request {
     bytes gamma_g2 = 1;
 }
 
-message ResultProto {
+message Response {
     bytes result = 1;
 }

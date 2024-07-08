@@ -38,7 +38,7 @@ async fn main() -> std::io::Result<()> {
     let mut cursor = Cursor::new(contents);
     let sk: SecretKey<E> = CanonicalDeserialize::deserialize_compressed(&mut cursor).expect("Unable to deserialize the data!");
 
-    let data = web::Data::new(Data {kzg_setup, sk});
+    let data = web::Data::new(Data { kzg_setup, sk });
 
     log::info!("starting HTTP server at http://localhost:8080");
     HttpServer::new(move || {
@@ -46,9 +46,10 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .app_data(web::JsonConfig::default().limit(240000)) // <- limit size of the payload (global configuration)
             .app_data(Data::clone(&data))
-            .service(web::resource("/partdec").route(web::post().to(decrypt_part)))
-            .service(web::resource("/decrypt").route(web::post().to(decrypt)))
-            .service(web::resource("/verifydec").route(web::post().to(verify_decryption_part)))
+            .service(web::resource("/encrypt").route(web::post().to(encrypt_route)))
+            .service(web::resource("/partdec").route(web::post().to(decrypt_part_route)))
+            .service(web::resource("/decrypt").route(web::post().to(decrypt_route)))
+            .service(web::resource("/verifydec").route(web::post().to(verify_part_route)))
     })
     .bind(("127.0.0.1", 8080))?
     .run()
