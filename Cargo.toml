@@ -26,6 +26,7 @@ prost = { version = "0.12.6", features = ["prost-derive"] }
 prost-types = "0.12.6"
 actix-protobuf = "0.10.0"
 hex = "0.4.3"
+clap = { version = "4.5.8", features = ["derive", "env", "wrap_help", "cargo"] }
 
 [features]
 asm = [ "ark-ff/asm" ]
