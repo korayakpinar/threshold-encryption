@@ -43,10 +43,12 @@ async fn main() -> std::io::Result<()> {
 
     log::info!("size: {}", contents.len());
     let json: KZG = serde_json::from_str::<KZG>(&mut contents).expect("can't deserialize data from transcript.json").into();
-    log::info!("numG1Powers: {}", json.transcripts[3].numG1Powers);
 
     let powers_of_g = convert_hex_to_g1(&json.transcripts[3].powersOfTau.G1Powers);
+    log::info!("numG1Powers: {}", json.transcripts[3].numG1Powers);
+
     let powers_of_h = convert_hex_to_g2(&json.transcripts[3].powersOfTau.G2Powers);
+    log::info!("numG1Powers: {}", json.transcripts[3].numG2Powers);
 
     let kzg_setup: UniversalParams<E> = UniversalParams { powers_of_g, powers_of_h };
 

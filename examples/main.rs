@@ -16,7 +16,7 @@ use silent_threshold::{
     decryption::{agg_dec, part_verify},
     encryption::encrypt,
     kzg::{UniversalParams, KZG10},
-    setup::{AggregateKey, PublicKey, SecretKey}, utils::lagrange_poly,
+    setup::{AggregateKey, PublicKey, SecretKey}, utils::{convert_hex_to_g1, convert_hex_to_g2, lagrange_poly},
 };
 use sha2::{Sha256, Digest};
 use aes::Aes256;
@@ -59,43 +59,6 @@ struct KZG {
     transcripts: Vec<Transcript>
 }
 
-fn convert_hex_to_g1(g1_powers: &Vec<String>) -> Vec<G1Affine> {
-    let mut g1_powers_decompressed = Vec::new();
-
-    let mut j = 0;
-    let len = g1_powers.len();
-    for i in g1_powers {
-        let g1_vec: Vec<u8> = hex::decode(i.clone().split_off(2)).unwrap();
-        let mut cur = Cursor::new(g1_vec);
-        let g1 = G1Affine::deserialize_compressed(&mut cur).unwrap();
-        g1_powers_decompressed.push(g1);
-        print!("{}/{}\t\r", j, len);
-        // println!("{:#?}", g1);
-        j += 1;
-    }
-    print!("\n");
-
-    g1_powers_decompressed
-}
-
-fn convert_hex_to_g2(g2_powers: &Vec<String>) -> Vec<G2Affine> {
-    let mut g2_powers_decompressed = Vec::new();
-    let mut j = 0;
-    let len = g2_powers.len();
-    for i in g2_powers {
-        let g2_powers: Vec<u8> = hex::decode(i.clone().split_off(2)).unwrap();
-        let mut cur = Cursor::new(g2_powers);
-        let g2 = G2Affine::deserialize_compressed(&mut cur).unwrap();
-        g2_powers_decompressed.push(g2);
-        print!("{}/{}\t\r", j, len);
-        j += 1;
-        // println!("{:#?}", g2);
-    }
-    print!("\n");
-
-    g2_powers_decompressed
-}
-
 fn main() {
     let mut file = File::open("transcript.json").unwrap();
 
@@ -104,10 +67,12 @@ fn main() {
 
     println!("size: {}", contents.len());
     let json: KZG = serde_json::from_str::<KZG>(&mut contents).unwrap().into();
-    println!("numG1Powers: {}", json.transcripts[3].numG1Powers);
 
     let powers_of_g = convert_hex_to_g1(&json.transcripts[3].powersOfTau.G1Powers);
+    println!("numG1Powers: {}", json.transcripts[3].numG1Powers);
+    
     let powers_of_h = convert_hex_to_g2(&json.transcripts[3].powersOfTau.G2Powers);
+    println!("numG2Powers: {}", json.transcripts[3].numG2Powers);
 
     //let q = "924530e2fdf93bd252309252ebc5d333345369748375e6a1d2c83215c1a6db770a79e72cf5ef568d773725c9230dcd13";
     //let y = hex::decode(q).unwrap();
@@ -116,13 +81,11 @@ fn main() {
     //println!("{}", z.is_ok());
 
     let mut rng = OsRng;
-    let n = 1 << 5; // actually n-1 total parties. one party is a dummy party that is always true
+    let n = 32; // actually n-1 total parties. one party is a dummy party that is always true
     let k = 22;
     let t: usize = 2;
     debug_assert!(t < n);
-    // let params = UniversalParams { powers_of_g, powers_of_h };
-    
-    let params = KZG10::<E, UniPoly381>::setup(n, &mut rng).unwrap();
+    let params = UniversalParams { powers_of_g, powers_of_h };
 
     let mut sk: Vec<SecretKey<E>> = Vec::new();
     let mut pk: Vec<PublicKey<E>> = Vec::new();
