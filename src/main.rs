@@ -68,6 +68,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/partdec").route(web::post().to(decrypt_part_route)))
             .service(web::resource("/decrypt").route(web::post().to(decrypt_route)))
             .service(web::resource("/verifydec").route(web::post().to(verify_part_route)))
+            .service(web::resource("/getpk").route(web::post().to(get_pk_route)))
     })
     .bind(("127.0.0.1", args.api_port))?
     .run()

@@ -118,11 +118,11 @@ fn main() {
     let mut rng = OsRng;
     let n = 1 << 5; // actually n-1 total parties. one party is a dummy party that is always true
     let k = 22;
-    let t: usize = 2;
+    let t: usize = 4;
     debug_assert!(t < n);
-    let params = UniversalParams { powers_of_g, powers_of_h };
+    // let params = UniversalParams { powers_of_g, powers_of_h };
     
-    // let params = KZG10::<E, UniPoly381>::setup(n, &mut rng).unwrap();
+    let params = KZG10::<E, UniPoly381>::setup(n, &mut rng).unwrap();
 
     let mut sk: Vec<SecretKey<E>> = Vec::new();
     let mut pk: Vec<PublicKey<E>> = Vec::new();
@@ -223,7 +223,7 @@ fn main() {
     for i in 0..t + 1 {
         let tmp = sk[i].partial_decryption(&ct);
         let x = part_verify(ct.gamma_g2, (pk.clone()).get(i).unwrap().to_owned(), params.powers_of_g[0].into(), tmp.clone());
-        println!("part_verify = {}", x);
+        // println!("part_verify = {}", x);
         partial_decryptions.push(tmp);
     }
     for _ in t + 1..n {
@@ -242,7 +242,7 @@ fn main() {
     }
     start = Instant::now();
     let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, t, n, &selector, &agg_key, &params);
-    println!("decryption: {:#?}", Duration::from(start.elapsed()));
+    println!("agg_dec: {:#?}", Duration::from(start.elapsed()));
 
     if ct.enc_key == _dec_key {
 
