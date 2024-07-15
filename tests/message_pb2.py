@@ -26,7 +26,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rmessage.proto\"C\n\x11VerifyPartRequest\x12\n\n\x02pk\x18\x01 \x01(\x0c\x12\x10\n\x08gamma_g2\x18\x02 \x01(\x0c\x12\x10\n\x08part_dec\x18\x03 \x01(\x0c\"{\n\x14\x44\x65\x63ryptParamsRequest\x12\x0b\n\x03\x65nc\x18\x01 \x01(\x0c\x12\x0b\n\x03pks\x18\x02 \x03(\x0c\x12\r\n\x05parts\x18\x03 \x03(\x0c\x12\x0b\n\x03sa1\x18\x04 \x01(\x0c\x12\x0b\n\x03sa2\x18\x05 \x01(\x0c\x12\n\n\x02iv\x18\x06 \x01(\x0c\x12\t\n\x01t\x18\x07 \x01(\x04\x12\t\n\x01n\x18\x08 \x01(\x04\"@\n\x0e\x45ncryptRequest\x12\x0b\n\x03msg\x18\x01 \x01(\x0c\x12\x0b\n\x03pks\x18\x02 \x03(\x0c\x12\t\n\x01t\x18\x03 \x01(\x04\x12\t\n\x01n\x18\x04 \x01(\x04\"V\n\x0f\x45ncryptResponse\x12\x0b\n\x03\x65nc\x18\x01 \x01(\x0c\x12\x0b\n\x03sa1\x18\x02 \x01(\x0c\x12\x0b\n\x03sa2\x18\x03 \x01(\x0c\x12\n\n\x02iv\x18\x04 \x01(\x0c\x12\x10\n\x08gamma_g2\x18\x05 \x01(\x0c\"\"\n\x0eGammaG2Request\x12\x10\n\x08gamma_g2\x18\x01 \x01(\x0c\"\x1a\n\x08Response\x12\x0e\n\x06result\x18\x01 \x01(\x0c\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rmessage.proto\"C\n\x11VerifyPartRequest\x12\n\n\x02pk\x18\x01 \x01(\x0c\x12\x10\n\x08gamma_g2\x18\x02 \x01(\x0c\x12\x10\n\x08part_dec\x18\x03 \x01(\x0c\"{\n\x14\x44\x65\x63ryptParamsRequest\x12\x0b\n\x03\x65nc\x18\x01 \x01(\x0c\x12\x0b\n\x03pks\x18\x02 \x03(\x0c\x12\r\n\x05parts\x18\x03 \x03(\x0c\x12\x0b\n\x03sa1\x18\x04 \x01(\x0c\x12\x0b\n\x03sa2\x18\x05 \x01(\x0c\x12\n\n\x02iv\x18\x06 \x01(\x0c\x12\t\n\x01t\x18\x07 \x01(\x04\x12\t\n\x01n\x18\x08 \x01(\x04\"@\n\x0e\x45ncryptRequest\x12\x0b\n\x03msg\x18\x01 \x01(\x0c\x12\x0b\n\x03pks\x18\x02 \x03(\x0c\x12\t\n\x01t\x18\x03 \x01(\x04\x12\t\n\x01n\x18\x04 \x01(\x04\"V\n\x0f\x45ncryptResponse\x12\x0b\n\x03\x65nc\x18\x01 \x01(\x0c\x12\x0b\n\x03sa1\x18\x02 \x01(\x0c\x12\x0b\n\x03sa2\x18\x03 \x01(\x0c\x12\n\n\x02iv\x18\x04 \x01(\x0c\x12\x10\n\x08gamma_g2\x18\x05 \x01(\x0c\"\"\n\x0eGammaG2Request\x12\x10\n\x08gamma_g2\x18\x01 \x01(\x0c\"\"\n\tPKRequest\x12\n\n\x02id\x18\x01 \x01(\x04\x12\t\n\x01n\x18\x02 \x01(\x04\"\x1a\n\x08Response\x12\x0e\n\x06result\x18\x01 \x01(\x0c\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -43,8 +43,10 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_ENCRYPTRESPONSE']._serialized_end=363
   _globals['_GAMMAG2REQUEST']._serialized_start=365
   _globals['_GAMMAG2REQUEST']._serialized_end=399
-  _globals['_RESPONSE']._serialized_start=401
-  _globals['_RESPONSE']._serialized_end=427
+  _globals['_PKREQUEST']._serialized_start=401
+  _globals['_PKREQUEST']._serialized_end=435
+  _globals['_RESPONSE']._serialized_start=437
+  _globals['_RESPONSE']._serialized_end=463
 # @@protoc_insertion_point(module_scope)
 
 class VerifyPartRequest(_message.Message, metaclass=_reflection.GeneratedProtocolMessageType):
@@ -64,6 +66,9 @@ class EncryptRequest(_message.Message, metaclass=_reflection.GeneratedProtocolMe
 
 class EncryptResponse(_message.Message, metaclass=_reflection.GeneratedProtocolMessageType):
   DESCRIPTOR = _globals['_ENCRYPTRESPONSE']
+
+class PKRequest(_message.Message, metaclass=_reflection.GeneratedProtocolMessageType):
+  DESCRIPTOR = _globals['_PKREQUEST']
 
 class Response(_message.Message, metaclass=_reflection.GeneratedProtocolMessageType):
   DESCRIPTOR = _globals['_RESPONSE']

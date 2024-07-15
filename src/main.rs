@@ -43,10 +43,12 @@ async fn main() -> std::io::Result<()> {
 
     log::info!("size: {}", contents.len());
     let json: KZG = serde_json::from_str::<KZG>(&mut contents).expect("can't deserialize data from transcript.json").into();
-    log::info!("numG1Powers: {}", json.transcripts[3].numG1Powers);
 
     let powers_of_g = convert_hex_to_g1(&json.transcripts[3].powersOfTau.G1Powers);
+    log::info!("numG1Powers: {}", json.transcripts[3].numG1Powers);
+
     let powers_of_h = convert_hex_to_g2(&json.transcripts[3].powersOfTau.G2Powers);
+    log::info!("numG1Powers: {}", json.transcripts[3].numG2Powers);
 
     let kzg_setup: UniversalParams<E> = UniversalParams { powers_of_g, powers_of_h };
 
@@ -68,6 +70,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/partdec").route(web::post().to(decrypt_part_route)))
             .service(web::resource("/decrypt").route(web::post().to(decrypt_route)))
             .service(web::resource("/verifydec").route(web::post().to(verify_part_route)))
+            .service(web::resource("/getpk").route(web::post().to(get_pk_route)))
     })
     .bind(("127.0.0.1", args.api_port))?
     .run()

@@ -156,7 +156,23 @@ pub struct GammaG2Request{
     pub gamma_g2: Vec<u8>
 }
 
+// Get PK
+#[derive(Clone, PartialEq, Eq, Message)]
+pub struct PKRequest {
+    #[prost(uint64, tag="1")]
+    pub id: u64,
+    #[prost(uint64, tag="2")]
+    pub n: u64
+}
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct PK {
+    pub id: usize,
+    pub n: usize
+}
+
 // Result
+
 #[derive(Clone, PartialEq, Eq, Message)]
 pub struct Response {
     #[prost(bytes, tag="1")]
