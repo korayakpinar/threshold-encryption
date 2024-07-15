@@ -156,17 +156,17 @@ pub fn deserialize_verify_part(proto: VerifyPartRequest) -> Option<VerifyPart> {
 }
 
 pub fn deserialize_pk_req(proto: PKRequest) -> Option<PK> {
+    let id_res = proto.id.try_into();
+    if id_res.is_err() {
+        return None;
+    }
+    let id = id_res.unwrap();
+
     let n_res = proto.n.try_into();
     if n_res.is_err() {
         return None;
     }
     let n = n_res.unwrap();
-
-    let id_res = proto.n.try_into();
-    if id_res.is_err() {
-        return None;
-    }
-    let id = id_res.unwrap();
 
     return Option::from(
         PK {
