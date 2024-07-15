@@ -118,7 +118,7 @@ fn main() {
     let mut rng = OsRng;
     let n = 1 << 5; // actually n-1 total parties. one party is a dummy party that is always true
     let k = 22;
-    let t: usize = 4;
+    let t: usize = 2;
     debug_assert!(t < n);
     // let params = UniversalParams { powers_of_g, powers_of_h };
     
