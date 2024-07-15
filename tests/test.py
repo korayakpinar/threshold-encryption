@@ -9,7 +9,7 @@ import message_pb2
 
 
 def partdec_test(
-    parts: List[ByteString],
+    part: ByteString,
     gamma_g2: ByteString
 ) -> bool:
     # set 12 ~/.sk
@@ -19,7 +19,7 @@ def partdec_test(
     resp = requests.post("http://127.0.0.1:8080/partdec", headers={'Content-Type': 'application/protobuf'}, data=m.SerializeToString())
     res = message_pb2.Response()
     r = res.ParseFromString(resp.content)
-    return res.result == parts[12]
+    return res.result == part
 
 
 def verifypart_test(
@@ -34,6 +34,21 @@ def verifypart_test(
 
     resp = requests.post("http://127.0.0.1:8080/verifydec", headers={'Content-Type': 'application/protobuf'}, data=m.SerializeToString())
     return resp.status_code == 200
+
+
+def getpk_test(
+    pk: ByteString,
+    key_id: int,
+    n: int
+) -> bool:
+    m = message_pb2.PKRequest()
+    m.id = key_id
+    m.n = n
+
+    resp = requests.post("http://127.0.0.1:8080/getpk", headers={'Content-Type': 'application/protobuf'}, data=m.SerializeToString())
+    res = message_pb2.Response()
+    r = res.ParseFromString(resp.content)
+    return res.result == pk
 
 
 def decrypt_test(
@@ -102,14 +117,16 @@ def main() -> None:
     with open("iv", "rb") as f:
         iv = f.read()
 
-    os.chdir("..")
-    proc = subprocess.Popen(["cargo", "run", "--", "--transcript", "transcript.json", "--bls-key", "tests/sks/12", "--api-port", "8080"])
-    time.sleep(45)
+    #os.chdir("..")
+    #proc = subprocess.Popen(["cargo", "run", "--", "--transcript", "transcript.json", "--bls-key", "tests/sks/12", "--api-port", "8080"])
+    #time.sleep(45)
 
-    assert(partdec_test(parts, gamma_g2) == True)
+    assert(partdec_test(parts[12], gamma_g2) == True)
 
     for i in range(k):
         assert(verifypart_test(pks[i], gamma_g2, parts[i]) == True)
+
+    assert(getpk_test(pks[12], 12, n))
 
     assert(decrypt_test(enc, pks, parts, sa1, sa2, iv, t, n) == True)
 
