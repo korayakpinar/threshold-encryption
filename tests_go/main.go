@@ -6,8 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
-	"time"
 
 	"github.com/korayakpinar/threshold-encryption/api"
 	"google.golang.org/protobuf/proto"
@@ -139,6 +137,42 @@ func PartialDecrypt(gammaG2 []byte) ([]byte, error) {
 	return partDecResp.Result, nil
 }
 
+func GetPK(id uint64, n uint64) ([]byte, error) {
+	client := http.Client{}
+
+	req := &api.PKRequest{
+		Id: id,
+		N:  n,
+	}
+	data, err := proto.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	postReader := bytes.NewReader(data)
+
+	resp, err := client.Post("http://127.0.0.1:8080/getpk", "application/protobuf", postReader)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	var partDecResp api.Response
+	err = proto.Unmarshal(bodyBytes, &partDecResp)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	return partDecResp.Result, nil
+}
+
 func VerifyPart(pk []byte, gammaG2 []byte, partDec []byte) error {
 	client := http.Client{}
 
@@ -236,7 +270,7 @@ func main() {
 	}
 
 	// Run the subprocess
-	cmd := exec.Command("cargo", "run", "--", "--transcript", "transcript.json", "--bls-key", "tests/sks/12", "--api-port", "8080")
+	/*cmd := exec.Command("cargo", "run", "--", "--transcript", "transcript.json", "--bls-key", "tests/sks/12", "--api-port", "8080")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err = cmd.Start()
@@ -247,10 +281,9 @@ func main() {
 
 	// Wait for 15 seconds
 	time.Sleep(15 * time.Second)
-
+	*/
 	// Verify the parts
 	part, err := PartialDecrypt(gammaG2)
-
 	if err != nil {
 		fmt.Println("partial decryption failed")
 		os.Exit(1)
@@ -267,6 +300,19 @@ func main() {
 		err := VerifyPart(pks[i], gammaG2, parts[i])
 		if err != nil {
 			fmt.Printf("can't verify %d. part\n", i)
+			os.Exit(1)
+		}
+	}
+
+	pk, err := GetPK(12, n)
+	if err != nil {
+		fmt.Println("partial decryption failed")
+		os.Exit(1)
+	}
+
+	for i := 0; i < len(pks[12]); i++ {
+		if pk[i] != pks[12][i] {
+			fmt.Println("failed to decrypt part")
 			os.Exit(1)
 		}
 	}
