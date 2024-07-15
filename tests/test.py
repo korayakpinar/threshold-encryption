@@ -117,9 +117,9 @@ def main() -> None:
     with open("iv", "rb") as f:
         iv = f.read()
 
-    #os.chdir("..")
-    #proc = subprocess.Popen(["cargo", "run", "--", "--transcript", "transcript.json", "--bls-key", "tests/sks/12", "--api-port", "8080"])
-    #time.sleep(45)
+    os.chdir("..")
+    proc = subprocess.Popen(["cargo", "run", "--", "--transcript", "transcript.json", "--bls-key", "tests/sks/12", "--api-port", "8080"])
+    time.sleep(45)
 
     assert(partdec_test(parts[12], gamma_g2) == True)
 
