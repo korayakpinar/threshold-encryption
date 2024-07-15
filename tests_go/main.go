@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"time"
 
 	"github.com/korayakpinar/threshold-encryption/api"
 	"google.golang.org/protobuf/proto"
@@ -270,7 +272,7 @@ func main() {
 	}
 
 	// Run the subprocess
-	/*cmd := exec.Command("cargo", "run", "--", "--transcript", "transcript.json", "--bls-key", "tests/sks/12", "--api-port", "8080")
+	cmd := exec.Command("cargo", "run", "--", "--transcript", "transcript.json", "--bls-key", "tests/sks/12", "--api-port", "8080")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err = cmd.Start()
@@ -281,7 +283,7 @@ func main() {
 
 	// Wait for 15 seconds
 	time.Sleep(15 * time.Second)
-	*/
+
 	// Verify the parts
 	part, err := PartialDecrypt(gammaG2)
 	if err != nil {
