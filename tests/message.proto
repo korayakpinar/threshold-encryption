@@ -1,4 +1,5 @@
 syntax = "proto3";
+option go_package="./api";
 
 message VerifyPartRequest {
     bytes pk = 1;
@@ -6,15 +7,16 @@ message VerifyPartRequest {
     bytes part_dec = 3;
 }
 
-message DecryptParamsRequest {
+message DecryptRequest {
     bytes enc = 1;
     repeated bytes pks = 2;
-    repeated bytes parts = 3;
-    bytes sa1 = 4;
-    bytes sa2 = 5;
-    bytes iv = 6;
-    uint64 t = 7;
-    uint64 n = 8;
+    map<uint64, bytes> parts = 3;
+    bytes gamma_g2 = 4; 
+    bytes sa1 = 5;
+    bytes sa2 = 6;
+    bytes iv = 7;
+    uint64 t = 8;
+    uint64 n = 9;
 }
 
 message EncryptRequest {
@@ -32,7 +34,7 @@ message EncryptResponse {
     bytes gamma_g2 = 5;
 }
 
-message GammaG2Request {
+message PartDecRequest {
     bytes gamma_g2 = 1;
 }
 
