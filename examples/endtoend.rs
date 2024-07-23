@@ -77,7 +77,7 @@ fn main() {
     let mut partial_decryptions: Vec<G2> = Vec::new();
     let mut rr = Vec::new();
     for i in 0..t + 1 {
-        let tmp = sk[i].partial_decryption(&ct);
+        let tmp = sk[i].partial_decryption(ct.gamma_g2);
         let mut tmp_1 = Vec::new();
         tmp.serialize_compressed(&mut tmp_1).unwrap();
         rr.extend(tmp_1.iter());

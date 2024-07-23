@@ -176,7 +176,7 @@ fn main() {
     for i in 0..k {
         let mut f = File::create(format!("tests/parts/{}", i)).unwrap();
         let mut wr = Vec::new();
-        sk[i].partial_decryption(&ct).serialize_compressed(&mut wr).unwrap();
+        sk[i].partial_decryption(ct.gamma_g2).serialize_compressed(&mut wr).unwrap();
         f.write_all(&wr).unwrap();
         wr.clear();
     }
@@ -184,7 +184,7 @@ fn main() {
     let mut partial_decryptions: Vec<G2> = Vec::new();
     start = Instant::now();
     for i in 0..t + 1 {
-        let tmp = sk[i].partial_decryption(&ct);
+        let tmp = sk[i].partial_decryption(ct.gamma_g2);
         let x = part_verify(ct.gamma_g2, (pk.clone()).get(i).unwrap().to_owned(), params.powers_of_g[0].into(), tmp.clone());
         // println!("part_verify = {}", x);
         partial_decryptions.push(tmp);

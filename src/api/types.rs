@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use ark_bls12_381::Bls12_381;
 use ark_ec::pairing::Pairing;
 
@@ -44,7 +46,7 @@ pub struct VerifyPartRequest {
 
 // Encrypt
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+#[derive(Clone)]
 pub struct Encrypt {
     pub msg: Vec<u8>,
     pub pks: Vec<PublicKey<E>>,
@@ -111,11 +113,12 @@ impl EncryptResponse {
 
 // DecryptParams
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
-pub struct DecryptParams {
+#[derive(Clone)]
+pub struct Decrypt {
     pub enc: Vec<u8>,
     pub pks: Vec<PublicKey<E>>,
-    pub parts: Vec<G2>,
+    pub parts: HashMap<usize, G2>,
+    pub gamma_g2: G2,
     pub sa1: [G1; 2],
     pub sa2: [G2; 6],
     pub iv: Vec<u8>,
@@ -124,39 +127,41 @@ pub struct DecryptParams {
 }
 
 #[derive(Clone, PartialEq, Eq, Message)]
-pub struct DecryptParamsRequest {
+pub struct DecryptRequest {
     #[prost(bytes, tag="1")]
     pub enc: Vec<u8>,
     #[prost(bytes, repeated, tag="2")]
     pub pks: Vec<Vec<u8>>,
-    #[prost(bytes, repeated, tag="3")]
-    pub parts: Vec<Vec<u8>>,
+    #[prost(map = "uint64, bytes", tag="3")]
+    pub parts: HashMap<u64, Vec<u8>>,
     #[prost(bytes, tag="4")]
-    pub sa1: Vec<u8>,
+    pub gamma_g2: Vec<u8>,
     #[prost(bytes, tag="5")]
-    pub sa2: Vec<u8>,
+    pub sa1: Vec<u8>,
     #[prost(bytes, tag="6")]
+    pub sa2: Vec<u8>,
+    #[prost(bytes, tag="7")]
     pub iv: Vec<u8>,
-    #[prost(uint64, tag="7")]
-    pub t: u64,
     #[prost(uint64, tag="8")]
+    pub t: u64,
+    #[prost(uint64, tag="9")]
     pub n: u64
 }
 
-// Gamma_G2
+// PartDec
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
-pub struct GammaG2 {
+#[derive(Clone)]
+pub struct PartDec {
     pub gamma_g2: G2
 }
 
 #[derive(Clone, PartialEq, Eq, Message)]
-pub struct GammaG2Request{
+pub struct PartDecRequest {
     #[prost(bytes, tag="1")]
     pub gamma_g2: Vec<u8>
 }
 
-// Get PK
+// PK
 #[derive(Clone, PartialEq, Eq, Message)]
 pub struct PKRequest {
     #[prost(uint64, tag="1")]
@@ -165,7 +170,7 @@ pub struct PKRequest {
     pub n: u64
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+#[derive(Clone)]
 pub struct PK {
     pub id: usize,
     pub n: usize

@@ -55,7 +55,7 @@ fn bench_decrypt(c: &mut Criterion) {
         // compute partial decryptions
         let mut partial_decryptions: Vec<G2> = Vec::new();
         for i in 0..t + 1 {
-            partial_decryptions.push(sk[i].partial_decryption(&ct));
+            partial_decryptions.push(sk[i].partial_decryption(ct.gamma_g2));
         }
         for _ in t + 1..n {
             partial_decryptions.push(G2::zero());

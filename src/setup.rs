@@ -6,7 +6,6 @@ use ark_serialize::*;
 use ark_std::{rand::RngCore, One, UniformRand, Zero};
 use std::ops::{Mul, Sub};
 
-use crate::encryption::Ciphertext;
 use crate::kzg::{UniversalParams, KZG10};
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
@@ -117,8 +116,8 @@ impl<E: Pairing> SecretKey<E> {
         }
     }
 
-    pub fn partial_decryption(&self, ct: &Ciphertext<E>) -> E::G2 {
-        ct.gamma_g2 * self.sk // kind of a bls signature on gamma_g2
+    pub fn partial_decryption(&self, gamma_g2: E::G2) -> E::G2 {
+        gamma_g2 * self.sk // kind of a bls signature on gamma_g2
     }
 }
 

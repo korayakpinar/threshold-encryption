@@ -1,9 +1,9 @@
-use std::io::Cursor;
+use std::{collections::HashMap, io::Cursor};
 
 use crate::api::types::*;
 use ark_serialize::CanonicalDeserialize;
 
-pub fn deserialize_decrypt_params(proto: DecryptParamsRequest) -> Option<DecryptParams> { 
+pub fn deserialize_decrypt_params(proto: DecryptRequest) -> Option<Decrypt> { 
     let cur = Cursor::new(proto.sa1);
     let tmp_sa1 = CanonicalDeserialize::deserialize_compressed(cur);
     if tmp_sa1.is_err() {
@@ -20,19 +20,12 @@ pub fn deserialize_decrypt_params(proto: DecryptParamsRequest) -> Option<Decrypt
     }
     let sa2: [G2; 6] = tmp_sa2.unwrap();
 
-    let mut parts = Vec::new();
-    for (idx, part) in proto.parts.iter().enumerate() {
-        let cur = Cursor::new(part);
-        let tmp_part = CanonicalDeserialize::deserialize_compressed(cur);
-        if tmp_part.is_err() {
-            log::error!("can't deserialize part {}", idx);
-            return None;
-        }
-        parts.push(tmp_part.unwrap());
-    }
-
+    // println!("{:?}", proto.pks);
     let mut pks = Vec::new();
     for (idx, pk) in proto.pks.iter().enumerate() {
+        if pk.is_empty() {
+            continue;
+        }
         let cur = Cursor::new(pk);
         let tmp_pk = CanonicalDeserialize::deserialize_compressed(cur);
         if tmp_pk.is_err() {
@@ -41,38 +34,48 @@ pub fn deserialize_decrypt_params(proto: DecryptParamsRequest) -> Option<Decrypt
         }
         pks.push(tmp_pk.unwrap());
     }
-    let tmp_usize = proto.n.try_into();
-    if tmp_usize.is_err() {
-        log::error!("can't read n");
-        return None;
-    }
-    let n = tmp_usize.unwrap();
 
-    let tmp_usize = proto.t.try_into();
-    if tmp_usize.is_err() {
-        log::error!("can't read t");
+    let mut parts = HashMap::new();
+    for part in proto.parts {
+        let cur = Cursor::new(part.1);
+        let tmp_part = CanonicalDeserialize::deserialize_compressed(cur);
+        if tmp_part.is_err() {
+            log::error!("can't deserialize part {}", part.0);
+            return None;
+        }
+        parts.insert(part.0 as usize, tmp_part.unwrap());
+    }
+
+    let cur = Cursor::new(proto.gamma_g2);
+    let tmp_gamma_g2 = CanonicalDeserialize::deserialize_compressed(cur);
+    if tmp_gamma_g2.is_err() {
+        log::error!("can't deserialize gamma_g2");
         return None;
     }
-    let t = tmp_usize.unwrap();
+    let gamma_g2 = tmp_gamma_g2.unwrap();
 
     Option::from(
-        DecryptParams {
+        Decrypt {
             enc: proto.enc,
             pks,
             parts,
+            gamma_g2,
             sa1,
             sa2,
             iv: proto.iv,
-            n,
-            t
+            n: proto.n as usize,
+            t: proto.t as usize
         }
     )
 }
 
 pub fn deserialize_encrypt(proto: EncryptRequest) -> Option<Encrypt> {
     let mut pks = Vec::new();
-    
+    // println!("len: {}", proto.pks.len());
     for (idx, pk) in proto.pks.iter().enumerate() {
+        if pk.is_empty() {
+            continue;
+        }
         let cur = Cursor::new(pk);
         let tmp_pk = CanonicalDeserialize::deserialize_compressed(cur);
         if tmp_pk.is_err() {
@@ -81,32 +84,18 @@ pub fn deserialize_encrypt(proto: EncryptRequest) -> Option<Encrypt> {
         }
         pks.push(tmp_pk.unwrap());
     }
-
-    let tmp_usize = proto.n.try_into();
-    if tmp_usize.is_err() {
-        log::error!("can't read n");
-        return None;
-    }
-    let n = tmp_usize.unwrap();
-
-    let tmp_usize = proto.t.try_into();
-    if tmp_usize.is_err() {
-        log::error!("can't read t");
-        return None;
-    }
-    let t = tmp_usize.unwrap();
     
     Option::from(
         Encrypt {
             msg: proto.msg,
             pks,
-            t,
-            n
+            t: proto.t as usize,
+            n: proto.n as usize
         }
     )
 }
 
-pub fn deserialize_gamma_g2(proto: GammaG2Request) -> Option<GammaG2> {
+pub fn deserialize_gamma_g2(proto: PartDecRequest) -> Option<PartDec> {
     let cur = Cursor::new(proto.gamma_g2);
     let tmp = CanonicalDeserialize::deserialize_compressed(cur);
     if tmp.is_err() {
@@ -115,7 +104,7 @@ pub fn deserialize_gamma_g2(proto: GammaG2Request) -> Option<GammaG2> {
     }
     let gamma_g2 = tmp.unwrap();
     Option::from(
-        GammaG2 {
+        PartDec {
             gamma_g2
         }
     )
@@ -156,22 +145,10 @@ pub fn deserialize_verify_part(proto: VerifyPartRequest) -> Option<VerifyPart> {
 }
 
 pub fn deserialize_pk_req(proto: PKRequest) -> Option<PK> {
-    let id_res = proto.id.try_into();
-    if id_res.is_err() {
-        return None;
-    }
-    let id = id_res.unwrap();
-
-    let n_res = proto.n.try_into();
-    if n_res.is_err() {
-        return None;
-    }
-    let n = n_res.unwrap();
-
     return Option::from(
         PK {
-            id,
-            n
+            id: proto.id as usize,
+            n: proto.n as usize
         }
     )
 }

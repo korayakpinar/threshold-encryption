@@ -1,4 +1,4 @@
-use std::{fs::File, mem::size_of_val};
+use std::fs::File;
 
 use ark_ec::{bls12::Bls12, pairing::Pairing};
 use ark_poly::univariate::DensePolynomial;
@@ -39,9 +39,9 @@ fn main() {
 
 
     let mut rng = OsRng;
-    let n = 1 << 5; // actually n-1 total parties. one party is a dummy party that is always true
-    let k: usize = 22;
-    let t: usize = 2;
+    let n = 8; // actually n-1 total parties. one party is a dummy party that is always true
+    let k: usize = 6;
+    let t: usize = 4;
     debug_assert!(t < n);
 
     let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>> = (0..n)
@@ -63,23 +63,23 @@ fn main() {
 
     // compute partial decryptions
     let mut partial_decryptions: Vec<G2> = Vec::new();
-    for i in 0..t + 1 {
-        partial_decryptions.push(sk[i].partial_decryption(&ct));
-    }
-    for _ in t + 1..n {
-        partial_decryptions.push(G2::zero());
-    }
-
-    println!("{}", size_of_val(&partial_decryptions[0]));
-
-    // compute the decryption key
     let mut selector: Vec<bool> = Vec::new();
-    for _ in 0..t + 1 {
-        selector.push(true);
+
+    let v: Vec<usize> = vec![0, 1, 3, 5, 2];
+
+    for i in 0..n {
+        if v.contains(&i) {
+            partial_decryptions.push(sk[i].partial_decryption(ct.gamma_g2));
+            selector.push(true);
+        } else {
+            partial_decryptions.push(G2::zero());
+            selector.push(false)
+        }
     }
-    for _ in t + 1..n {
-        selector.push(false);
-    }
+    println!("parts: {:#?}\nselector: {:#?}", partial_decryptions, selector);
+
+    // println!("{}", size_of_val(&partial_decryptions[0]));
+
 
     let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, t, n, &selector, &agg_key, &params);
 

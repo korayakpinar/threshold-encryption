@@ -13,7 +13,7 @@ use sha2::{Sha256, Digest};
 use block_modes::BlockMode;
 
 use crate::encryption::encrypt;
-use crate::setup::AggregateKey;
+use crate::setup::{AggregateKey, SecretKey};
 use crate::decryption::{agg_dec, part_verify};
 
 use crate::api::types::*;
@@ -29,19 +29,32 @@ pub async fn encrypt_route(config: HttpRequest, data: ProtoBuf<EncryptRequest>) 
     let encrypt_data_res = deserialize_encrypt(data.0);
     if encrypt_data_res.is_none() {
         log::error!("can't deserialize encrypt_data");
+        return HttpResponse::BadRequest().finish();
     }
     let encrypt_data = encrypt_data_res.unwrap();
 
-    let aggregated = AggregateKey::<E>::new(encrypt_data.pks, encrypt_data.n, &kzg_setup);
+    let mut pks = encrypt_data.pks;
+
+    let mut rng = OsRng;
+    
+    let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>> = (0..encrypt_data.n)
+        .map(|j| lagrange_poly(encrypt_data.n, j))
+        .collect();
+
+    let mut sk_zero: SecretKey<E> = SecretKey::new(&mut rng);
+    sk_zero.nullify();
+    pks.insert(0, sk_zero.get_pk(0, &kzg_setup, encrypt_data.n, &lagrange_polys));
+
+
+    let aggregated = AggregateKey::<E>::new(pks, encrypt_data.n, &kzg_setup);
     let ct = encrypt(&aggregated, encrypt_data.t, &kzg_setup);
 
     let mut hasher = Sha256::new();
     hasher.update(ct.enc_key.to_string().as_bytes());
-    let result = hasher.finalize();
+    let result = hasher.clone().finalize();
 
     let key = result.as_slice();
 
-    let mut rng = OsRng;
     let iv = &mut [0u8; 16];
     rng.fill(iv);
 
@@ -53,6 +66,7 @@ pub async fn encrypt_route(config: HttpRequest, data: ProtoBuf<EncryptRequest>) 
     let cipher_enc = cipher_enc_res.unwrap();
     
     let enc = cipher_enc.encrypt_vec(&encrypt_data.msg);
+    hasher.update(ct.enc_key.to_string().as_bytes());
 
     let resp = HttpResponse::Ok().protobuf(EncryptResponse::new(enc, ct, iv.to_vec()));
     if resp.is_err() {
@@ -62,7 +76,7 @@ pub async fn encrypt_route(config: HttpRequest, data: ProtoBuf<EncryptRequest>) 
     resp.unwrap()
 }
 
-pub async fn decrypt_part_route(config: HttpRequest, data: ProtoBuf<GammaG2Request>) -> HttpResponse {
+pub async fn decrypt_part_route(config: HttpRequest, data: ProtoBuf<PartDecRequest>) -> HttpResponse {
     let datum = config.app_data::<Data>().unwrap();
     let sk = datum.sk.clone();
 
@@ -90,7 +104,7 @@ pub async fn decrypt_part_route(config: HttpRequest, data: ProtoBuf<GammaG2Reque
     resp.unwrap()
 }
 
-pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptParamsRequest>) -> HttpResponse {
+pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptRequest>) -> HttpResponse {
     let datum = config.app_data::<Data>().unwrap();
     let kzg_setup = datum.clone().kzg_setup;
 
@@ -102,24 +116,36 @@ pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptParamsRequ
     let params = params_res.unwrap();
 
     let mut selector: Vec<bool> = Vec::new();
-    for _ in 0..params.t + 1 {
-        selector.push(true);
-    }
-    for _ in params.t + 1..params.n {
-        selector.push(false);
+    let mut partial_decryptions: Vec<G2> = Vec::new();
+
+    selector.push(true);
+
+    let mut rng = OsRng;
+    let mut sk_zero: SecretKey<E> = SecretKey::new(&mut rng);
+    sk_zero.nullify();
+    partial_decryptions.push(sk_zero.partial_decryption(params.gamma_g2));
+
+    for idx in 1..params.n {
+        if params.parts.contains_key(&idx) {
+            selector.push(true);
+            partial_decryptions.push(*params.parts.get(&idx).unwrap());
+        } else {
+            selector.push(false);
+            partial_decryptions.push(G2::zero());
+        }
     }
 
-    let mut partial_decryptions: Vec<G2> = Vec::new();
-    for i in 0..params.t + 1 {
-        partial_decryptions.push(params.parts[i]);
-    }
-    for _ in params.t + 1..params.n {
-        partial_decryptions.push(G2::zero());
-    }
+    let mut pks = params.pks;
+
+    let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>> = (0..params.n)
+        .map(|j| lagrange_poly(params.n, j))
+        .collect();
+
+    pks.insert(0, sk_zero.get_pk(0, &kzg_setup, params.n, &lagrange_polys));
 
     //println!("{:#?}, {:#?}, {:#?}, {}, {}", partial_decryptions, partial_decryptions.len(), params.parts.len(), params.t, params.n);
 
-    let aggregated = AggregateKey::<E>::new(params.pks.clone(), params.n, &kzg_setup);
+    let aggregated = AggregateKey::<E>::new(pks, params.n, &kzg_setup);
     let key = agg_dec(&partial_decryptions, &params.sa1, &params.sa2, params.t, params.n, &selector, &aggregated, &kzg_setup);
 
     let mut hasher = Sha256::new();
@@ -137,7 +163,7 @@ pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptParamsRequ
 
     let decrypted_res = cipher_dec.decrypt_vec(&params.enc);
     if decrypted_res.is_err() {
-        log::error!("failed to decrypt the data");
+        log::error!("failed to decrypt the data, {}", decrypted_res.err().unwrap());
         return HttpResponse::UnavailableForLegalReasons().finish();
     }
     let result = decrypted_res.unwrap();
