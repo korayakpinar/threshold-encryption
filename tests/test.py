@@ -1,4 +1,4 @@
-from typing import List, ByteString
+from typing import Dict, List, ByteString
 import subprocess
 import random
 import time
@@ -13,7 +13,7 @@ def partdec_test(
     gamma_g2: ByteString
 ) -> bool:
     # set 12 ~/.sk
-    m = message_pb2.GammaG2Request()
+    m = message_pb2.PartDecRequest()
     m.gamma_g2 = gamma_g2
     
     resp = requests.post("http://127.0.0.1:8080/partdec", headers={'Content-Type': 'application/protobuf'}, data=m.SerializeToString())
@@ -54,17 +54,20 @@ def getpk_test(
 def decrypt_test(
     enc: ByteString,
     pks: List[ByteString],
-    parts: List[ByteString],
+    parts: Dict[int, ByteString],
+    gamma_g2: ByteString,
     sa1: ByteString,
     sa2: ByteString,
     iv: ByteString,
     t: int,
     n: int
 ) -> bool:
-    m = message_pb2.DecryptParamsRequest()
+    m = message_pb2.DecryptRequest()
     m.enc = enc
     m.pks[:] = pks
-    m.parts[:] = parts
+    for i, j in parts.items():
+        m.parts[i] = j
+    m.gamma_g2 = gamma_g2
     m.sa1 = sa1
     m.sa2 = sa2
     m.iv = iv
@@ -128,7 +131,10 @@ def main() -> None:
 
     assert(getpk_test(pks[12], 12, n))
 
-    assert(decrypt_test(enc, pks, parts, sa1, sa2, iv, t, n) == True)
+    pks = pks[1:]
+    parts = parts[1:]
+    parts = {i+1: j for i, j in enumerate(parts)}
+    assert(decrypt_test(enc, pks, parts, gamma_g2, sa1, sa2, iv, t, n) == True)
 
 
 if __name__ == "__main__":

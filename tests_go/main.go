@@ -6,15 +6,14 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
-	"time"
 
 	"github.com/korayakpinar/threshold-encryption/api"
 	"google.golang.org/protobuf/proto"
 )
 
-func EncryptTransaction(msg []byte, pks [][]byte, t uint64, n uint64) ([]byte, error) {
+func EncryptTransaction(msg []byte, pks [][]byte, t uint64, n uint64, url string) (api.EncryptResponse, error) {
 	client := http.Client{}
+	var encryptDataResp api.EncryptResponse
 
 	req := &api.EncryptRequest{
 		Msg: msg,
@@ -24,48 +23,48 @@ func EncryptTransaction(msg []byte, pks [][]byte, t uint64, n uint64) ([]byte, e
 	}
 	data, err := proto.Marshal(req)
 	if err != nil {
-		return nil, err
+		return encryptDataResp, err
 	}
 
 	postReader := bytes.NewReader(data)
 
-	resp, err := client.Post("http://127.0.0.1:8080/encrypt", "application/protobuf", postReader)
+	resp, err := client.Post(url, "application/protobuf", postReader)
 
 	if err != nil {
-		return nil, err
+		return encryptDataResp, err
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, err
+	if resp.StatusCode == 400 {
+		return encryptDataResp, err
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return encryptDataResp, err
 	}
 
-	var encryptDataResp api.Response
 	err = proto.Unmarshal(bodyBytes, &encryptDataResp)
 	if err != nil {
-		return nil, err
+		return encryptDataResp, err
 	}
 
-	return encryptDataResp.Result, nil
+	return encryptDataResp, nil
 }
 
-func DecryptTransaction(enc []byte, pks [][]byte, parts [][]byte, sa1 []byte, sa2 []byte, iv []byte, t uint64, n uint64) ([]byte, error) {
+func DecryptTransaction(enc []byte, pks [][]byte, parts map[uint64]([]byte), gamma_g2 []byte, sa1 []byte, sa2 []byte, iv []byte, t uint64, n uint64) ([]byte, error) {
 	client := http.Client{}
 
-	req := &api.DecryptParamsRequest{
-		Enc:   []byte(enc),
-		Pks:   pks,
-		Parts: parts,
-		Sa1:   sa1,
-		Sa2:   sa2,
-		Iv:    iv,
-		T:     t,
-		N:     n,
+	req := &api.DecryptRequest{
+		Enc:     []byte(enc),
+		Pks:     pks,
+		Parts:   parts,
+		GammaG2: gamma_g2,
+		Sa1:     sa1,
+		Sa2:     sa2,
+		Iv:      iv,
+		T:       t,
+		N:       n,
 	}
 	data, err := proto.Marshal(req)
 	if err != nil {
@@ -98,10 +97,10 @@ func DecryptTransaction(enc []byte, pks [][]byte, parts [][]byte, sa1 []byte, sa
 	return decryptDataResp.Result, nil
 }
 
-func PartialDecrypt(gammaG2 []byte) ([]byte, error) {
+func PartialDecrypt(gammaG2 []byte, url string) ([]byte, error) {
 	client := http.Client{}
 
-	req := &api.GammaG2Request{
+	req := &api.PartDecRequest{
 		GammaG2: []byte(gammaG2),
 	}
 	data, err := proto.Marshal(req)
@@ -112,7 +111,7 @@ func PartialDecrypt(gammaG2 []byte) ([]byte, error) {
 
 	postReader := bytes.NewReader(data)
 
-	resp, err := client.Post("http://127.0.0.1:8080/partdec", "application/protobuf", postReader)
+	resp, err := client.Post(url, "application/protobuf", postReader)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
@@ -139,7 +138,7 @@ func PartialDecrypt(gammaG2 []byte) ([]byte, error) {
 	return partDecResp.Result, nil
 }
 
-func GetPK(id uint64, n uint64) ([]byte, error) {
+func GetPK(id uint64, n uint64, url string) ([]byte, error) {
 	client := http.Client{}
 
 	req := &api.PKRequest{
@@ -153,7 +152,7 @@ func GetPK(id uint64, n uint64) ([]byte, error) {
 
 	postReader := bytes.NewReader(data)
 
-	resp, err := client.Post("http://127.0.0.1:8080/getpk", "application/protobuf", postReader)
+	resp, err := client.Post(url, "application/protobuf", postReader)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +174,7 @@ func GetPK(id uint64, n uint64) ([]byte, error) {
 	return partDecResp.Result, nil
 }
 
-func VerifyPart(pk []byte, gammaG2 []byte, partDec []byte) error {
+func VerifyPart(pk []byte, gammaG2 []byte, partDec []byte, url string) error {
 	client := http.Client{}
 
 	req := &api.VerifyPartRequest{
@@ -190,7 +189,7 @@ func VerifyPart(pk []byte, gammaG2 []byte, partDec []byte) error {
 
 	postReader := bytes.NewReader(data)
 
-	resp, err := client.Post("http://127.0.0.1:8080/verifydec", "application/protobuf", postReader)
+	resp, err := client.Post(url, "application/protobuf", postReader)
 	if err != nil {
 		return err
 	}
@@ -203,131 +202,63 @@ func VerifyPart(pk []byte, gammaG2 []byte, partDec []byte) error {
 }
 
 func main() {
-	var n uint64 = 32
-	var k uint64 = 22
+	var n uint64 = 8
+	var k uint64 = 5
 	var t uint64 = 2
 
-	enc, err := os.ReadFile("enc")
-	if err != nil {
-		fmt.Println("Error reading enc:", err)
-		return
-	}
+	expected := "Hello, world!"
 
 	pks := make([][]byte, k)
-	sks := make([][]byte, k)
-	parts := make([][]byte, k)
-
-	for i := 0; i < int(k); i++ {
-		pk, err := os.ReadFile(fmt.Sprintf("pks/%d", i))
+	j := 8080
+	for i := 1; i < int(k); i++ {
+		pk, err := GetPK(uint64(i), n, fmt.Sprintf("http://127.0.0.1:%d/getpk", j))
 		if err != nil {
-			fmt.Println("Error reading pk:", err)
+			fmt.Println("can't get pk", err)
 			os.Exit(1)
 		}
 		pks[i] = pk
+		j++
+	}
 
-		sk, err := os.ReadFile(fmt.Sprintf("sks/%d", i))
+	enc, err := EncryptTransaction([]byte(expected), pks, t, n, "http://127.0.0.1:8080/encrypt")
+
+	if err != nil {
+		fmt.Println("can't encrypt transaction")
+		os.Exit(1)
+	}
+
+	parts := make([][]byte, n)
+	j = 8080
+
+	for i := 1; i < int(k); i++ {
+		part, err := PartialDecrypt(enc.GammaG2, fmt.Sprintf("http://127.0.0.1:%d/partdec", j))
 		if err != nil {
-			fmt.Println("Error reading sk:", err)
+			fmt.Println("can't get part")
 			os.Exit(1)
 		}
-		sks[i] = sk
-
-		part, err := os.ReadFile(fmt.Sprintf("parts/%d", i))
+		err = VerifyPart(pks[i], enc.GammaG2, part, "http://127.0.0.1:8080/verifydec")
 		if err != nil {
-			fmt.Println("Error reading part:", err)
+			fmt.Println("can't verify part")
 			os.Exit(1)
 		}
 		parts[i] = part
+		j++
 	}
 
-	sa1, err := os.ReadFile("sa1")
-	if err != nil {
-		fmt.Println("Error reading sa1:", err)
-		os.Exit(1)
-	}
+	new_parts := make(map[uint64]([]byte))
+	new_parts[1] = parts[1]
+	new_parts[3] = parts[3]
 
-	sa2, err := os.ReadFile("sa2")
-	if err != nil {
-		fmt.Println("Error reading sa2:", err)
-		os.Exit(1)
-	}
+	dec, err := DecryptTransaction(enc.Enc, pks, new_parts, enc.GammaG2, enc.Sa1, enc.Sa2, enc.Iv, t, n)
 
-	gammaG2, err := os.ReadFile("gamma_g2")
-	if err != nil {
-		fmt.Println("Error reading gamma_g2:", err)
-		os.Exit(1)
-	}
-
-	iv, err := os.ReadFile("iv")
-	if err != nil {
-		fmt.Println("Error reading iv:", err)
-		os.Exit(1)
-	}
-
-	// Change directory
-	err = os.Chdir("..")
-	if err != nil {
-		fmt.Println("Error changing directory:", err)
-		os.Exit(1)
-	}
-
-	// Run the subprocess
-	cmd := exec.Command("cargo", "run", "--", "--transcript", "transcript.json", "--bls-key", "tests/sks/12", "--api-port", "8080")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err = cmd.Start()
-	if err != nil {
-		fmt.Println("Error starting subprocess:", err)
-		return
-	}
-
-	// Wait for 15 seconds
-	time.Sleep(15 * time.Second)
-
-	// Verify the parts
-	part, err := PartialDecrypt(gammaG2)
-	if err != nil {
-		fmt.Println("partial decryption failed")
-		os.Exit(1)
-	}
-
-	for i := 0; i < len(parts[12]); i++ {
-		if part[i] != parts[12][i] {
-			fmt.Println("failed to decrypt part")
-			os.Exit(1)
-		}
-	}
-
-	for i := 0; i < int(k); i++ {
-		err := VerifyPart(pks[i], gammaG2, parts[i])
-		if err != nil {
-			fmt.Printf("can't verify %d. part\n", i)
-			os.Exit(1)
-		}
-	}
-
-	pk, err := GetPK(12, n)
-	if err != nil {
-		fmt.Println("partial decryption failed")
-		os.Exit(1)
-	}
-
-	for i := 0; i < len(pks[12]); i++ {
-		if pk[i] != pks[12][i] {
-			fmt.Println("failed to decrypt part")
-			os.Exit(1)
-		}
-	}
-
-	// Decrypt
-	dec, err := DecryptTransaction(enc, pks, parts, sa1, sa2, iv, t, n)
 	if err != nil {
 		fmt.Println("can't decrypt transaction")
 		os.Exit(1)
 	}
 
-	if string(dec) != "Hello, world!" {
-		fmt.Println("dec = ", dec)
+	if string(dec) != expected {
+		fmt.Println("can't decrypt the data")
 		os.Exit(1)
 	}
+
 }
