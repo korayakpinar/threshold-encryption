@@ -28,16 +28,17 @@ pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptRequest>) 
     let params = params_res.unwrap();
 
     let mut selector: Vec<bool> = Vec::new();
-    let mut partial_decryptions: Vec<G2> = Vec::new();
-
-    selector.push(true);
-
+    selector.push(true);    
+    
     let mut rng = OsRng;
+
     let mut sk_zero: SecretKey<E> = SecretKey::new(&mut rng);
     sk_zero.nullify();
+
+    let mut partial_decryptions: Vec<G2> = Vec::new();
     partial_decryptions.push(sk_zero.partial_decryption(params.gamma_g2));
 
-    for idx in 1..params.n {
+    for idx in 0..params.n {
         if params.parts.contains_key(&idx) {
             selector.push(true);
             partial_decryptions.push(*params.parts.get(&idx).unwrap());

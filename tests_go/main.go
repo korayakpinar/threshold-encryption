@@ -202,15 +202,15 @@ func VerifyPart(pk []byte, gammaG2 []byte, partDec []byte, url string) error {
 }
 
 func main() {
-	var n uint64 = 8
-	var k uint64 = 5
+	var n uint64 = 64
+	var k uint64 = 4
 	var t uint64 = 2
 
 	expected := "Hello, world!"
 
 	pks := make([][]byte, k)
 	j := 8080
-	for i := 1; i < int(k); i++ {
+	for i := 0; i < int(k); i++ {
 		pk, err := GetPK(uint64(i), n, fmt.Sprintf("http://127.0.0.1:%d/getpk", j))
 		if err != nil {
 			fmt.Println("can't get pk", err)
@@ -230,7 +230,7 @@ func main() {
 	parts := make([][]byte, n)
 	j = 8080
 
-	for i := 1; i < int(k); i++ {
+	for i := 0; i < int(k); i++ {
 		part, err := PartialDecrypt(enc.GammaG2, fmt.Sprintf("http://127.0.0.1:%d/partdec", j))
 		if err != nil {
 			fmt.Println("can't get part")
@@ -246,8 +246,8 @@ func main() {
 	}
 
 	new_parts := make(map[uint64]([]byte))
-	new_parts[1] = parts[1]
-	new_parts[3] = parts[3]
+	new_parts[0] = parts[0]
+	new_parts[2] = parts[2]
 
 	dec, err := DecryptTransaction(enc.Enc, pks, new_parts, enc.GammaG2, enc.Sa1, enc.Sa2, enc.Iv, t, n)
 

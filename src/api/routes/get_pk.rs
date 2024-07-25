@@ -25,7 +25,7 @@ pub async fn get_pk_route(config: HttpRequest, data: ProtoBuf<PKRequest>) -> Htt
         .map(|j| lagrange_poly(pk.n, j))
         .collect();
 
-    let pk = sk.get_pk(pk.id, params, pk.n, &lagrange_polys);
+    let pk = sk.get_pk(pk.id + 1, params, pk.n, &lagrange_polys);
     
     let mut result = Vec::new();
     let res = pk.serialize_compressed(&mut result);
