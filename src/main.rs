@@ -52,11 +52,18 @@ async fn main() -> std::io::Result<()> {
 
     let kzg_setup: UniversalParams<E> = UniversalParams { powers_of_g, powers_of_h };
 
+    drop(json);
+    drop(contents);
+    drop(file);
+
     let mut file = File::open(args.bls_key).expect("Can't open the file!");
     let mut contents = Vec::new();
     file.read_to_end(&mut contents).expect("Can't read the file!");
     let mut cursor = Cursor::new(contents);
     let sk: SecretKey<E> = CanonicalDeserialize::deserialize_compressed(&mut cursor).expect("Unable to deserialize the data!");
+
+    drop(file);
+    drop(cursor);
 
     let data = web::Data::new(Data { kzg_setup, sk });
 
