@@ -1,9 +1,10 @@
 /target
 /Cargo.lock
-transcript.json
 venv/
 __pycache__/
-
+.vscode/
+keys/
+transcript*
 parts/
 pks/
 sks/

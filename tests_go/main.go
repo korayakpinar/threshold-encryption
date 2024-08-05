@@ -202,8 +202,8 @@ func VerifyPart(pk []byte, gammaG2 []byte, partDec []byte, url string) error {
 }
 
 func main() {
-	var n uint64 = 64
-	var k uint64 = 4
+	var n uint64 = 4
+	var k uint64 = 3
 	var t uint64 = 2
 
 	expected := "Hello, world!"
