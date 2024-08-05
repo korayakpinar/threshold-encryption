@@ -216,6 +216,23 @@ func main() {
 			fmt.Println("can't get pk", err)
 			os.Exit(1)
 		}
+		file, err := os.Open(fmt.Sprintf("../keys/%d-pk", i+1))
+		if err != nil {
+			fmt.Println("can't open file", err)
+			os.Exit(1)
+		}
+		z := make([]byte, 1024)
+		_, err = file.Read(z)
+		for w := 0; w < len(pk); w++ {
+			if pk[w] != z[w] {
+				fmt.Println("pk is wrong")
+				os.Exit(1)
+			}
+		}
+		if err != nil {
+			fmt.Println("can't read file", err)
+			os.Exit(1)
+		}
 		pks[i] = pk
 		j++
 	}
