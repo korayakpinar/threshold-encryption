@@ -9,7 +9,6 @@ use silent_threshold::{
 };
 
 use std::io::prelude::*;
-// use ark_serialize::*;
 
 fn main() {
     let mut file = File::open("transcript.json").unwrap();
@@ -28,15 +27,6 @@ fn main() {
 
     let mut sk: Vec<SecretKey<E>> = Vec::new();
     let mut pk: Vec<PublicKey<E>> = Vec::new();
-
-    ////////
-    ////////
-    //////// 
-    ////////
-    //////// 
-    ////////
-    ////////
-
 
     let mut rng = OsRng;
     let n = 8; // actually n-1 total parties. one party is a dummy party that is always true
@@ -77,9 +67,6 @@ fn main() {
         }
     }
     println!("parts: {:#?}\nselector: {:#?}", partial_decryptions, selector);
-
-    // println!("{}", size_of_val(&partial_decryptions[0]));
-
 
     let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, t, n, &selector, &agg_key, &params);
 

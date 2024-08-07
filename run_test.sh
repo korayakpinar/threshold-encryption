@@ -1,5 +1,5 @@
 #!/bin/bash
-cargo run --example main
+cargo run --example initkeys --release -- -n 2 -k 1
+cargo run --release -- --bls-key keys/1-bls --transcript transcript --api-port 8080 &
 cd tests
-source venv/bin/activate
-python3 test.py
+go run main.go

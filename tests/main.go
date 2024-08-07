@@ -202,9 +202,9 @@ func VerifyPart(pk []byte, gammaG2 []byte, partDec []byte, url string) error {
 }
 
 func main() {
-	var n uint64 = 4
-	var k uint64 = 3
-	var t uint64 = 2
+	var n uint64 = 2
+	var k uint64 = 1
+	var t uint64 = 1
 
 	expected := "Hello, world!"
 
@@ -264,7 +264,6 @@ func main() {
 
 	new_parts := make(map[uint64]([]byte))
 	new_parts[0] = parts[0]
-	new_parts[2] = parts[2]
 
 	dec, err := DecryptTransaction(enc.Enc, pks, new_parts, enc.GammaG2, enc.Sa1, enc.Sa2, enc.Iv, t, n)
 

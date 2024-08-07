@@ -1,6 +1,6 @@
 #![allow(non_snake_case, dead_code, unused_variables, unused_imports)]
 use core::panic;
-use std::{borrow::Borrow, env, io::Cursor, os, sync::{Arc, Once}, time::{self, Duration, Instant}};
+use std::{borrow::Borrow, env, fs, io::Cursor, os, path::Path, sync::{Arc, Once}, time::{self, Duration, Instant}};
 
 use actix_web::body::MessageBody;
 use ark_poly::univariate::DensePolynomial;
@@ -114,6 +114,10 @@ async fn main() {
 
     // Get the static reference to the LAGRANGE_POLYS
     let lagrange_polys: &'static [DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>] = get_lagrange_polys();
+
+    if !Path::new("./keys").exists() {
+        fs::create_dir("./keys").unwrap();
+    }
 
     let mut tasks = Vec::new();
     for i in 0..args.k {
