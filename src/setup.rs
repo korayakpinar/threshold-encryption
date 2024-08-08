@@ -23,6 +23,7 @@ pub struct PublicKey<E: Pairing> {
     pub sk_li_by_tau: E::G1,    //hint
 }
 
+#[derive(Clone)]
 pub struct AggregateKey<E: Pairing> {
     pub pk: Vec<PublicKey<E>>,
     pub agg_sk_li_by_z: Vec<E::G1>,

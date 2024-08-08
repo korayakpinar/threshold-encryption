@@ -1,38 +1,25 @@
-use std::fs::File;
-
 use ark_ec::{bls12::Bls12, pairing::Pairing};
 use ark_poly::univariate::DensePolynomial;
 use ark_std::Zero;
 use rand::rngs::OsRng;
 use silent_threshold::{
-    api::types::{E, G2}, decryption::agg_dec, encryption::encrypt, kzg::UniversalParams, setup::{AggregateKey, PublicKey, SecretKey}, utils::{convert_hex_to_g1, convert_hex_to_g2, lagrange_poly, KZG}
+    api::types::{E, G2}, decryption::agg_dec, encryption::encrypt, kzg::{UniversalParams, KZG10}, setup::{AggregateKey, PublicKey, SecretKey}, utils::lagrange_poly
 };
 
-use std::io::prelude::*;
+type UniPoly381 = DensePolynomial<<E as Pairing>::ScalarField>;
 
-fn main() {
-    let mut file = File::open("transcript.json").unwrap();
-
-    let mut contents: String = String::new();
-    file.read_to_string(&mut contents).unwrap();
-
-    println!("size: {}", contents.len());
-    let json: KZG = serde_json::from_str::<KZG>(&mut contents).unwrap().into();
-    println!("numG1Powers: {}", json.transcripts[1].numG1Powers);
-
-    let powers_of_g = convert_hex_to_g1(&json.transcripts[1].powersOfTau.G1Powers);
-    let powers_of_h = convert_hex_to_g2(&json.transcripts[1].powersOfTau.G2Powers);
-
-    let params = UniversalParams { powers_of_g, powers_of_h };
-
-    let mut sk: Vec<SecretKey<E>> = Vec::new();
-    let mut pk: Vec<PublicKey<E>> = Vec::new();
-
-    let mut rng = OsRng;
+#[tokio::main]
+async fn main() {
     let n = 16; // actually n-1 total parties. one party is a dummy party that is always true
     let _k: usize = 6;
     let t: usize = 10;
     debug_assert!(t < n);
+
+    let mut rng = OsRng;
+    let params: UniversalParams<E> = KZG10::<E, UniPoly381>::setup(n, &mut rng).unwrap();
+
+    let mut sk: Vec<SecretKey<E>> = Vec::new();
+    let mut pk: Vec<PublicKey<E>> = Vec::new();
 
     let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>> = (0..n)
         .map(|j| lagrange_poly(n, j))
@@ -81,7 +68,7 @@ fn main() {
     }
     println!("parts: {:#?}\nselector: {:#?}", partial_decryptions, selector);
 
-    let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, t, n, &selector, &agg_key, &params);
+    let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, t, n, &selector, &agg_key, &params).await;
 
     println!("{}", _dec_key == ct.enc_key);
 }

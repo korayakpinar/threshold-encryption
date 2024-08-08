@@ -1,23 +1,14 @@
 use actix_web::{middleware, web, App, HttpServer};
-// use ark_ec::pairing::Pairing;
-// use ark_poly::univariate::DensePolynomial;
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::Read;
 use clap::{arg, command, Parser};
-// use rand::rngs::OsRng;
 use silent_threshold::kzg::UniversalParams;
-// use silent_threshold::kzg::KZG10;
 use silent_threshold::setup::SecretKey;
-// use silent_threshold::utils::convert_hex_to_g1;
-// use silent_threshold::utils::convert_hex_to_g2;
 use std::fs::File;
 use std::io::Cursor;
 
-// use silent_threshold::utils::KZG;
 use silent_threshold::api::routes::*;
 use silent_threshold::api::types::*;
-
-// type UniPoly381 = DensePolynomial<<E as Pairing>::ScalarField>;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -49,23 +40,11 @@ async fn main() -> std::io::Result<()> {
         let mut contents = Vec::new();
         file.read_to_end(&mut contents).expect("can't read transcript.json to a string");
 
-        // println!("size: {}", contents.len());
-        // let json: KZG = serde_json::from_str::<KZG>(&mut contents).expect("can't deserialize data from transcript.json").into();
-
-        //let powers_of_g = convert_hex_to_g1(&json.transcripts[0].powersOfTau.G1Powers);
-        //println!("numG1Powers: {}", json.transcripts[0].numG1Powers);
-
-        //let powers_of_h = convert_hex_to_g2(&json.transcripts[0].powersOfTau.G2Powers);
-        // println!("numG1Powers: {}", json.transcripts[0].numG2Powers);
         let mut cursor = Cursor::new(contents);
         kzg_setup = CanonicalDeserialize::deserialize_compressed(&mut cursor).expect("Unable to deserialize kzg_setup");
         println!("powers_of_g: {}, powers_of_h: {}", kzg_setup.powers_of_g.len(), kzg_setup.powers_of_h.len());
     }
-/*
-    let mut rng = OsRng;
-    let kzg_setup = KZG10::<E, UniPoly381>::setup(65536, &mut rng).unwrap();
-    log::info!("powers_of_g: {}, powers_of_h: {}", kzg_setup.powers_of_g.len(), kzg_setup.powers_of_h.len());
-*/
+
     let sk: SecretKey<E>;
     {
         let mut file = File::open(args.bls_key).expect("Can't open the file!");

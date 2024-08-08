@@ -1,6 +1,6 @@
-use ark_bls12_381::Bls12_381;
+use ark_bls12_381::{Bls12_381, Config};
 use ark_ec::{
-    pairing::{Pairing, PairingOutput}, VariableBaseMSM
+    bls12::{Bls12, G1Prepared, G2Prepared}, pairing::{Pairing, PairingOutput}, VariableBaseMSM
 };
 use ark_poly::{
     univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, Polynomial,
@@ -10,12 +10,17 @@ use ark_std::{One, Zero};
 use std::ops::Div;
 
 use crate::{
-    kzg::{UniversalParams, KZG10},
-    setup::{AggregateKey, PublicKey},
-    utils::interp_mostly_zero,
+    api::types::{E, G1, G2}, kzg::{UniversalParams, KZG10}, setup::{AggregateKey, PublicKey}, utils::{interp_mostly_zero, IsValidHelper}
 };
 
-pub fn agg_dec<E: Pairing>(
+struct Parameters {
+    pub agg_key: AggregateKey<E>,
+    pub b: DensePolynomial<<E as Pairing>::ScalarField>,
+    pub b_evals: Vec<<E as Pairing>::ScalarField>,
+    pub params: UniversalParams<E>,
+}
+
+pub async fn agg_dec<E: Pairing>(
     partial_decryptions: &[E::G2], //insert 0 if a party did not respond or verification failed
     sa1: &[E::G1; 2],
     sa2: &[E::G2; 6],
@@ -27,7 +32,6 @@ pub fn agg_dec<E: Pairing>(
 ) -> PairingOutput<E> {
     let domain = Radix2EvaluationDomain::<E::ScalarField>::new(n).unwrap();
     let domain_elements: Vec<E::ScalarField> = domain.elements().collect();
-
     // points is where B is set to zero
     // parties is the set of parties who have signed
     let mut points = vec![domain_elements[0]]; // 0 is the dummy party that is always true
@@ -46,10 +50,15 @@ pub fn agg_dec<E: Pairing>(
     debug_assert!(b.degree() == points.len() - 1);
     debug_assert!(b.evaluate(&domain_elements[0]) == E::ScalarField::one());
 
+    let b_async = b.clone();
+    let params_async = params.clone();
     // commit to b in g2
-    let b_g2: E::G2 = KZG10::<E, DensePolynomial<E::ScalarField>>::commit_g2(params, &b)
-        .unwrap()
-        .into();
+    let b_g2_task = tokio::spawn(async move {
+        // let b_g2: E::G2 = 
+        KZG10::<E, DensePolynomial<E::ScalarField>>::commit_g2(&params_async, &b_async)
+            .unwrap()
+    }).await;
+    // let b_g2_output = tokio::join!(b_g2_task);
 
     // q0 = (b-1)/(x-domain_elements[0])
     let mut bminus1 = b.clone();
@@ -67,73 +76,115 @@ pub fn agg_dec<E: Pairing>(
 
     // bhat = x^t * b
     // insert t 0s at the beginning of bhat.coeffs
-    let mut bhat_coeffs = vec![E::ScalarField::zero(); t];
-    bhat_coeffs.append(&mut b.coeffs.clone());
-    let bhat = DensePolynomial::from_coefficients_vec(bhat_coeffs);
-    debug_assert_eq!(bhat.degree(), n - 1);
 
-    let bhat_g1: E::G1 = KZG10::<E, DensePolynomial<E::ScalarField>>::commit_g1(params, &bhat)
-        .unwrap()
-        .into();
+    let b_async = b.clone();
+    let agg_key_async = agg_key.clone();
+    let params_async = params.clone();
+
+    let bhat_g1_task = tokio::spawn(async move {
+        let mut bhat_coeffs = vec![E::ScalarField::zero(); t];
+        bhat_coeffs.append(&mut b_async.coeffs.clone());
+        let bhat = DensePolynomial::from_coefficients_vec(bhat_coeffs);
+        debug_assert_eq!(bhat.degree(), n - 1);
+
+        // let bhat_g1: E::G1 =
+        KZG10::<E, DensePolynomial<E::ScalarField>>::commit_g1(&params_async, &bhat)
+            .unwrap()
+    }).await;
+    // let bhat_g1_output = tokio::join!(bhat_g1_task);
 
     let n_inv = E::ScalarField::one() / E::ScalarField::from((n) as u32);
 
+    let b_evals_async = b_evals.clone();
+    let parties_async = parties.clone();
+
     // compute the aggregate public key
-    let mut bases: Vec<<E as Pairing>::G1Affine> = Vec::new();
-    let mut scalars: Vec<<E as Pairing>::ScalarField> = Vec::new();
-    for &i in &parties {
-        bases.push(agg_key.pk[i].bls_pk.into());
-        scalars.push(b_evals[i]);
-    }
-    let mut apk = E::G1::msm(bases.as_slice(), scalars.as_slice()).unwrap();
-    apk *= n_inv;
+    let apk_task = tokio::spawn(async move {
+        let mut bases: Vec<<E as Pairing>::G1Affine> = Vec::new();
+        let mut scalars: Vec<<E as Pairing>::ScalarField> = Vec::new();
+        for &i in &parties_async {
+            bases.push(agg_key_async.pk[i].bls_pk.into());
+            scalars.push(b_evals_async[i]);
+        }
+        let mut apk = E::G1::msm(bases.as_slice(), scalars.as_slice()).unwrap();
+        apk *= n_inv;
+        apk
+    }).await;
+    // let apk_output = tokio::join!(apk_task);
 
-    // compute sigma = (\sum B(omega^i)partial_decryptions[i])/(n) for i in parties
-    let mut bases: Vec<<E as Pairing>::G2Affine> = Vec::new();
-    let mut scalars: Vec<<E as Pairing>::ScalarField> = Vec::new();
-    for &i in &parties {
-        bases.push(partial_decryptions[i].into());
-        scalars.push(b_evals[i]);
-    }
-    let mut sigma = E::G2::msm(bases.as_slice(), scalars.as_slice()).unwrap();
-    sigma *= n_inv;
+    let b_evals_async = b_evals.clone();
+    let partial_decryptions_async = partial_decryptions.to_vec().clone();
+    let parties_async = parties.clone();
 
-    // compute Qx, Qhatx and Qz
-    let mut bases: Vec<<E as Pairing>::G1Affine> = Vec::new();
-    let mut scalars: Vec<<E as Pairing>::ScalarField> = Vec::new();
-    for &i in &parties {
-        bases.push(agg_key.pk[i].sk_li_by_tau.into());
-        scalars.push(b_evals[i]);
-    }
-    let qx = E::G1::msm(bases.as_slice(), scalars.as_slice()).unwrap();
+    let sigma_task = tokio::spawn(async move {
+        // compute sigma = (\sum B(omega^i)partial_decryptions[i])/(n) for i in parties
+        let mut bases: Vec<<E as Pairing>::G2Affine> = Vec::new();
+        let mut scalars: Vec<<E as Pairing>::ScalarField> = Vec::new();
+        for &i in &parties_async {
+            bases.push(partial_decryptions_async[i].into());
+            scalars.push(b_evals_async[i]);
+        }
+        let mut sigma = E::G2::msm(bases.as_slice(), scalars.as_slice()).unwrap();
+        sigma *= n_inv;
+        sigma
+    }).await;
 
-    let mut bases: Vec<<E as Pairing>::G1Affine> = Vec::new();
-    let mut scalars: Vec<<E as Pairing>::ScalarField> = Vec::new();
-    for &i in &parties {
-        bases.push(agg_key.agg_sk_li_by_z[i].into());
-        scalars.push(b_evals[i]);
-    }
-    let qz = E::G1::msm(bases.as_slice(), scalars.as_slice()).unwrap();
+    let b_evals_async = b_evals.clone();
+    let agg_key_async = agg_key.clone();
+    let parties_async = parties.clone();
 
-    let mut bases: Vec<<E as Pairing>::G1Affine> = Vec::new();
-    let mut scalars: Vec<<E as Pairing>::ScalarField> = Vec::new();
-    for &i in &parties {
-        bases.push(agg_key.pk[i].sk_li_minus0.into());
-        scalars.push(b_evals[i]);
-    }
-    let qhatx = E::G1::msm(bases.as_slice(), scalars.as_slice()).unwrap();
+    let qx_task = tokio::spawn(async move {
+        // compute Qx, Qhatx and Qz
+        let mut bases: Vec<<E as Pairing>::G1Affine> = Vec::new();
+        let mut scalars: Vec<<E as Pairing>::ScalarField> = Vec::new();
+        for &i in &parties_async {
+            bases.push(agg_key_async.pk[i].sk_li_by_tau.into());
+            scalars.push(b_evals_async[i]);
+        }
+        // let qx =
+        E::G1::msm(bases.as_slice(), scalars.as_slice()).unwrap()
+    }).await;
+
+    let b_evals_async = b_evals.clone();
+    let parties_async = parties.clone();
+
+    let qz_task = tokio::spawn(async move {
+        let mut bases: Vec<<E as Pairing>::G1Affine> = Vec::new();
+        let mut scalars: Vec<<E as Pairing>::ScalarField> = Vec::new();
+        for &i in &parties_async {
+            bases.push(agg_key_async.agg_sk_li_by_z[i].into());
+            scalars.push(b_evals_async[i]);
+        }
+        // let qz =
+        E::G1::msm(bases.as_slice(), scalars.as_slice()).unwrap()
+    }).await;
+
+    let b_evals_async = b_evals.clone();
+    let agg_key_async = agg_key.clone();
+    let parties_async = parties.clone();
+
+    let qhatx_task = tokio::spawn(async move {
+        let mut bases: Vec<<E as Pairing>::G1Affine> = Vec::new();
+        let mut scalars: Vec<<E as Pairing>::ScalarField> = Vec::new();
+        for &i in &parties_async {
+            bases.push(agg_key_async.pk[i].sk_li_minus0.into());
+            scalars.push(b_evals_async[i]);
+        }
+        // let qhatx =
+        E::G1::msm(bases.as_slice(), scalars.as_slice()).unwrap()
+    }).await;
 
     // e(w1||sa1, sa2||w2)
     let minus1 = -E::ScalarField::one();
     let w1 = [
-        apk * (minus1),
-        qz * (minus1),
-        qx * (minus1),
-        qhatx,
-        bhat_g1 * (minus1),
+        apk_task.unwrap() * (minus1),
+        qz_task.unwrap() * (minus1),
+        qx_task.unwrap().into() * (minus1),
+        qhatx_task.unwrap(),
+        bhat_g1_task.unwrap() * (minus1),
         q0_g1 * (minus1),
     ];
-    let w2 = [b_g2, sigma];
+    let w2 = [b_g2_task.unwrap().into(), sigma_task.unwrap()];
 
     let mut enc_key_lhs = w1.to_vec();
     enc_key_lhs.append(&mut sa1.to_vec());
@@ -148,6 +199,35 @@ pub fn agg_dec<E: Pairing>(
 
 pub fn part_verify(gamma_g2: <Bls12_381 as Pairing>::G2, pk: PublicKey<Bls12_381>, g1: <Bls12_381 as Pairing>::G1, part_dec: <Bls12_381 as Pairing>::G2) -> bool {
     Bls12_381::pairing(pk.bls_pk, gamma_g2) == Bls12_381::pairing(g1, part_dec)
+}
+
+fn prepare_and_pair(hint: G1, prepared_g2: &G2Prepared<Config>, prepared_bls_pk: &G1Prepared<Config>, li_x: G2) -> bool {
+    let prepared_hint = G1Prepared::from(hint);
+    let prepared_li_x = G2Prepared::from(li_x);
+
+    Bls12::pairing(prepared_hint, prepared_g2.clone()) == Bls12::pairing(prepared_bls_pk.clone(), prepared_li_x)
+}
+
+pub fn is_valid(pk: PublicKey<E>, n: usize, kzg_params: &UniversalParams<Bls12<ark_bls12_381::Config>>, helper: &IsValidHelper) -> bool {
+    let prepared_g2 = G2Prepared::from(kzg_params.powers_of_h[0]);
+    let prepared_bls_pk = G1Prepared::from(pk.bls_pk);
+
+    if prepare_and_pair(pk.sk_li, &prepared_g2, &prepared_bls_pk, helper.li) == false {
+        return false;
+    }
+    if prepare_and_pair(pk.sk_li_minus0, &prepared_g2, &prepared_bls_pk, helper.li_minus0) == false {
+        return false;
+    }
+    if prepare_and_pair(pk.sk_li_by_tau, &prepared_g2, &prepared_bls_pk, helper.li_by_tau) == false {
+        return false;
+    }
+    for i in 0..n {
+        if prepare_and_pair(pk.sk_li_by_z[i], &prepared_g2, &prepared_bls_pk, helper.li_by_z[i]) == false {
+            return false;
+        }
+    }
+
+    true
 }
 
 #[cfg(test)]

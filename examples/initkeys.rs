@@ -7,7 +7,6 @@ use ark_poly::univariate::DensePolynomial;
 use ark_serialize::Read;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use hex::{self, ToHex};
 
 use ark_bls12_381::{Bls12_381, G1Affine, G2Affine};
@@ -18,7 +17,7 @@ use silent_threshold::{
     decryption::{agg_dec, part_verify},
     encryption::encrypt,
     kzg::{UniversalParams, KZG10},
-    setup::{AggregateKey, PublicKey, SecretKey}, utils::{convert_hex_to_g1, convert_hex_to_g2, lagrange_poly},
+    setup::{AggregateKey, PublicKey, SecretKey}, utils::lagrange_poly,
 };
 use sha2::{Sha256, Digest};
 use aes::Aes256;

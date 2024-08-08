@@ -1,14 +1,13 @@
-#![allow(non_snake_case, unused_variables)]
-use std::io::Cursor;
-
-use ark_bls12_381::{G1Affine, G2Affine};
+use ark_ec::{bls12::Bls12, pairing::Pairing};
 use ark_ff::{FftField, Field};
 use ark_poly::{
     univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, Evaluations, Polynomial,
     Radix2EvaluationDomain,
 };
-use serde::{Deserialize, Serialize};
-use ark_serialize::*;
+use ark_std::Zero;
+use std::{ops::{Mul, Sub}, time};
+
+use crate::{api::types::{E, G2}, kzg::{UniversalParams, KZG10}};
 
 // 1 at omega^i and 0 elsewhere on domain {omega^i}_{i \in [n]}
 pub fn lagrange_poly<F: FftField>(n: usize, i: usize) -> DensePolynomial<F> {
@@ -49,65 +48,69 @@ pub fn interp_mostly_zero<F: Field>(eval: F, points: &Vec<F>) -> DensePolynomial
     interp
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Powers {
-    pub G1Powers: Vec<String>,
-    pub G2Powers: Vec<String>
+
+pub struct IsValidHelper {
+    pub li: G2,
+    pub li_minus0: G2,
+    pub li_by_tau: G2,
+    pub li_by_z: Vec<G2>
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Witness {
-    pub runningProducts: Vec<String>,
-    pub potPubkeys: Vec<String>,
-    pub blsSignatures: Vec<String>
-}
+impl IsValidHelper {
+    pub fn new(n: usize, lagrange_polys: &Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>>, params: &UniversalParams<E>) -> Vec<Self> {
+        let domain = Radix2EvaluationDomain::<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>::new(n).unwrap();
 
-#[derive(Serialize, Deserialize)]
-pub struct Transcript {
-    pub numG1Powers: u32,
-    pub numG2Powers: u32,
-    pub powersOfTau: Powers,
-    pub witness: Witness
-}
+        let mut self_vec: Vec<Self> = Vec::new();
 
-#[derive(Serialize, Deserialize)]
-pub struct KZG {
-    pub transcripts: Vec<Transcript>
-}
+        for id in 0..n {
+            let ti = time::Instant::now();
+            let li = &lagrange_polys[id];
 
-pub fn convert_hex_to_g1(g1_powers: &Vec<String>) -> Vec<G1Affine> {
-    let mut g1_powers_decompressed = Vec::new();
+            let mut li_by_z = vec![];
+            for j in 0..n {
+                let num = if id == j {
+                    li.mul(li).sub(li)
+                } else {
+                    //cross-terms
+                    //let l_j = lagrange_polys[j].clone();
+                    lagrange_polys[j].mul(li)
+                };
 
-    let mut j = 0;
-    let len = g1_powers.len();
-    for i in g1_powers {
-        let g1_vec: Vec<u8> = hex::decode(i.clone().split_off(2)).unwrap();
-        let mut cur = Cursor::new(g1_vec);
-        let g1 = G1Affine::deserialize_compressed(&mut cur).unwrap();
-        g1_powers_decompressed.push(g1);
-        // print!("{}/{}\t\r", j, len);
-        // println!("{:#?}", g1);
-        j += 1;
+                let f = num.divide_by_vanishing_poly(domain).unwrap().0;
+
+                let com = KZG10::commit_g2(params, &f)
+                    .expect("commitment failed")
+                    .into();
+
+                li_by_z.push(com);
+            }
+
+            let f = DensePolynomial::from_coefficients_vec(li.coeffs[1..].to_vec());
+            let li_by_tau = KZG10::commit_g2(params, &f)
+                .expect("commitment failed")
+                .into();
+
+            let mut f = li.to_owned();
+            let li = KZG10::commit_g2(params, &f)
+                .expect("commitment failed")
+                .into();
+
+            f.coeffs[0] = <Bls12<ark_bls12_381::Config> as Pairing>::ScalarField::zero();
+            let li_minus0 = KZG10::commit_g2(params, &f)
+                .expect("commitment failed")
+                .into();
+            
+            self_vec.push(
+                Self {
+                    li,
+                    li_by_tau,
+                    li_by_z,
+                    li_minus0
+                }
+            );
+            println!("{}: {:#?} elapsed", id, ti.elapsed());
+        }
+
+        self_vec
     }
-    // print!("\n");
-
-    g1_powers_decompressed
-}
-
-pub fn convert_hex_to_g2(g2_powers: &Vec<String>) -> Vec<G2Affine> {
-    let mut g2_powers_decompressed = Vec::new();
-    let mut j = 0;
-    let len = g2_powers.len();
-    for i in g2_powers {
-        let g2_powers: Vec<u8> = hex::decode(i.clone().split_off(2)).unwrap();
-        let mut cur = Cursor::new(g2_powers);
-        let g2 = G2Affine::deserialize_compressed(&mut cur).unwrap();
-        g2_powers_decompressed.push(g2);
-        // print!("{}/{}\t\r", j, len);
-        // println!("{:#?}", g2);
-        j += 1;
-    }
-    // print!("\n");
-
-    g2_powers_decompressed
 }
