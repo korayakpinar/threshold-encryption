@@ -4,11 +4,6 @@ venv/
 __pycache__/
 .vscode/
 keys/
-parts/
-pks/
-sks/
-enc
-gamma_g2
-iv
-sa1
-sa2
+lagrangehelpers/1024
+isvalidhelpers/1024
+transcript-1024
