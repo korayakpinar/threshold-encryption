@@ -5,8 +5,8 @@ use ark_serialize::CanonicalDeserialize;
 use crate::api::types::{Decrypt, DecryptRequest, G1, G2};
 
 impl DecryptRequest {
-    pub fn deserialize(proto: DecryptRequest) -> Option<Decrypt> { 
-        let cur = Cursor::new(proto.sa1);
+    pub fn deserialize(self) -> Option<Decrypt> { 
+        let cur = Cursor::new(self.sa1);
         let tmp_sa1 = CanonicalDeserialize::deserialize_compressed(cur);
         if tmp_sa1.is_err() {
             log::error!("can't deserialize sa1");
@@ -14,7 +14,7 @@ impl DecryptRequest {
         }
         let sa1: [G1; 2] = tmp_sa1.unwrap();
 
-        let q = Cursor::new(proto.sa2);
+        let q = Cursor::new(self.sa2);
         let tmp_sa2 = CanonicalDeserialize::deserialize_compressed(q);
         if tmp_sa2.is_err() {
             log::error!("can't deserialize sa2");
@@ -24,7 +24,7 @@ impl DecryptRequest {
 
         // println!("{:?}", proto.pks);
         let mut pks = Vec::new();
-        for (idx, pk) in proto.pks.iter().enumerate() {
+        for (idx, pk) in self.pks.iter().enumerate() {
             if pk.is_empty() {
                 continue;
             }
@@ -38,7 +38,7 @@ impl DecryptRequest {
         }
 
         let mut parts = HashMap::new();
-        for part in proto.parts {
+        for part in self.parts {
             let cur = Cursor::new(part.1);
             let tmp_part = CanonicalDeserialize::deserialize_compressed(cur);
             if tmp_part.is_err() {
@@ -48,7 +48,7 @@ impl DecryptRequest {
             parts.insert(part.0 as usize, tmp_part.unwrap());
         }
 
-        let cur = Cursor::new(proto.gamma_g2);
+        let cur = Cursor::new(self.gamma_g2);
         let tmp_gamma_g2 = CanonicalDeserialize::deserialize_compressed(cur);
         if tmp_gamma_g2.is_err() {
             log::error!("can't deserialize gamma_g2");
@@ -58,15 +58,15 @@ impl DecryptRequest {
 
         Option::from(
             Decrypt {
-                enc: proto.enc,
+                enc: self.enc,
                 pks,
                 parts,
                 gamma_g2,
                 sa1,
                 sa2,
-                iv: proto.iv,
-                n: proto.n as usize,
-                t: proto.t as usize
+                iv: self.iv,
+                n: self.n as usize,
+                t: self.t as usize
             }
         )
     }

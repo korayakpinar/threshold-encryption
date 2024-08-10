@@ -8,7 +8,7 @@ pub async fn decrypt_part_route(config: HttpRequest, data: ProtoBuf<PartDecReque
     let datum = config.app_data::<Data>().unwrap();
     let sk = datum.sk.clone();
 
-    let decrypt_part_res = PartDecRequest::deserialize(data.0);
+    let decrypt_part_res = data.0.deserialize();
     if decrypt_part_res.is_none() {
         log::error!("can't deserialize gamma_g2");
         return HttpResponse::BadRequest().finish();

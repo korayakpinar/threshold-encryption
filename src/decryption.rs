@@ -13,13 +13,6 @@ use crate::{
     api::types::{E, G1, G2}, kzg::{UniversalParams, KZG10}, setup::{AggregateKey, PublicKey}, utils::{interp_mostly_zero, IsValidHelper}
 };
 
-struct Parameters {
-    pub agg_key: AggregateKey<E>,
-    pub b: DensePolynomial<<E as Pairing>::ScalarField>,
-    pub b_evals: Vec<<E as Pairing>::ScalarField>,
-    pub params: UniversalParams<E>,
-}
-
 pub async fn agg_dec<E: Pairing>(
     partial_decryptions: &[E::G2], //insert 0 if a party did not respond or verification failed
     sa1: &[E::G1; 2],
@@ -57,7 +50,7 @@ pub async fn agg_dec<E: Pairing>(
         // let b_g2: E::G2 = 
         KZG10::<E, DensePolynomial<E::ScalarField>>::commit_g2(&params_async, &b_async)
             .unwrap()
-    }).await;
+    });
     // let b_g2_output = tokio::join!(b_g2_task);
 
     // q0 = (b-1)/(x-domain_elements[0])
@@ -90,7 +83,7 @@ pub async fn agg_dec<E: Pairing>(
         // let bhat_g1: E::G1 =
         KZG10::<E, DensePolynomial<E::ScalarField>>::commit_g1(&params_async, &bhat)
             .unwrap()
-    }).await;
+    });
     // let bhat_g1_output = tokio::join!(bhat_g1_task);
 
     let n_inv = E::ScalarField::one() / E::ScalarField::from((n) as u32);
@@ -109,7 +102,7 @@ pub async fn agg_dec<E: Pairing>(
         let mut apk = E::G1::msm(bases.as_slice(), scalars.as_slice()).unwrap();
         apk *= n_inv;
         apk
-    }).await;
+    });
     // let apk_output = tokio::join!(apk_task);
 
     let b_evals_async = b_evals.clone();
@@ -127,7 +120,7 @@ pub async fn agg_dec<E: Pairing>(
         let mut sigma = E::G2::msm(bases.as_slice(), scalars.as_slice()).unwrap();
         sigma *= n_inv;
         sigma
-    }).await;
+    });
 
     let b_evals_async = b_evals.clone();
     let agg_key_async = agg_key.clone();
@@ -143,7 +136,7 @@ pub async fn agg_dec<E: Pairing>(
         }
         // let qx =
         E::G1::msm(bases.as_slice(), scalars.as_slice()).unwrap()
-    }).await;
+    });
 
     let b_evals_async = b_evals.clone();
     let parties_async = parties.clone();
@@ -157,7 +150,7 @@ pub async fn agg_dec<E: Pairing>(
         }
         // let qz =
         E::G1::msm(bases.as_slice(), scalars.as_slice()).unwrap()
-    }).await;
+    });
 
     let b_evals_async = b_evals.clone();
     let agg_key_async = agg_key.clone();
@@ -172,19 +165,19 @@ pub async fn agg_dec<E: Pairing>(
         }
         // let qhatx =
         E::G1::msm(bases.as_slice(), scalars.as_slice()).unwrap()
-    }).await;
+    });
 
     // e(w1||sa1, sa2||w2)
     let minus1 = -E::ScalarField::one();
     let w1 = [
-        apk_task.unwrap() * (minus1),
-        qz_task.unwrap() * (minus1),
-        qx_task.unwrap().into() * (minus1),
-        qhatx_task.unwrap(),
-        bhat_g1_task.unwrap() * (minus1),
+        apk_task.await.unwrap() * (minus1),
+        qz_task.await.unwrap() * (minus1),
+        qx_task.await.unwrap().into() * (minus1),
+        qhatx_task.await.unwrap(),
+        bhat_g1_task.await.unwrap() * (minus1),
         q0_g1 * (minus1),
     ];
-    let w2 = [b_g2_task.unwrap().into(), sigma_task.unwrap()];
+    let w2 = [b_g2_task.await.unwrap().into(), sigma_task.await.unwrap()];
 
     let mut enc_key_lhs = w1.to_vec();
     enc_key_lhs.append(&mut sa1.to_vec());
@@ -197,7 +190,7 @@ pub async fn agg_dec<E: Pairing>(
     enc_key
 }
 
-pub fn part_verify(gamma_g2: <Bls12_381 as Pairing>::G2, pk: PublicKey<Bls12_381>, g1: <Bls12_381 as Pairing>::G1, part_dec: <Bls12_381 as Pairing>::G2) -> bool {
+pub fn part_verify(gamma_g2: <Bls12_381 as Pairing>::G2, pk: &PublicKey<Bls12_381>, g1: <Bls12_381 as Pairing>::G1, part_dec: <Bls12_381 as Pairing>::G2) -> bool {
     Bls12_381::pairing(pk.bls_pk, gamma_g2) == Bls12_381::pairing(g1, part_dec)
 }
 
@@ -208,21 +201,41 @@ fn prepare_and_pair(hint: G1, prepared_g2: &G2Prepared<Config>, prepared_bls_pk:
     Bls12::pairing(prepared_hint, prepared_g2.clone()) == Bls12::pairing(prepared_bls_pk.clone(), prepared_li_x)
 }
 
-pub fn is_valid(pk: PublicKey<E>, n: usize, kzg_params: &UniversalParams<Bls12<ark_bls12_381::Config>>, helper: &IsValidHelper) -> bool {
+pub async fn is_valid(pk: &PublicKey<E>, n: usize, kzg_params: &UniversalParams<Bls12<ark_bls12_381::Config>>, helper: &IsValidHelper) -> bool {
     let prepared_g2 = G2Prepared::from(kzg_params.powers_of_h[0]);
     let prepared_bls_pk = G1Prepared::from(pk.bls_pk);
 
-    if prepare_and_pair(pk.sk_li, &prepared_g2, &prepared_bls_pk, helper.li) == false {
-        return false;
-    }
-    if prepare_and_pair(pk.sk_li_minus0, &prepared_g2, &prepared_bls_pk, helper.li_minus0) == false {
-        return false;
-    }
-    if prepare_and_pair(pk.sk_li_by_tau, &prepared_g2, &prepared_bls_pk, helper.li_by_tau) == false {
-        return false;
-    }
+    let mut tasks = Vec::new();
+
+    let sk_li = pk.sk_li;
+    let li = helper.li[pk.id];
+    let prepared_g2_async = prepared_g2.clone();
+    let prepared_bls_pk_async = prepared_bls_pk.clone();
+    tasks.push(tokio::spawn(async move { prepare_and_pair(sk_li, &prepared_g2_async, &prepared_bls_pk_async, li) }));
+    
+    let sk_li_minus0 = pk.sk_li_minus0;
+    let li_minus0 = helper.li_minus0[pk.id];
+    let prepared_g2_async = prepared_g2.clone();
+    let prepared_bls_pk_async = prepared_bls_pk.clone();
+    tasks.push(tokio::spawn(async move { prepare_and_pair(sk_li_minus0, &prepared_g2_async, &prepared_bls_pk_async, li_minus0 )}));
+    
+    let sk_li_by_tau = pk.sk_li_by_tau;
+    let li_by_tau = helper.li_by_tau[pk.id];
+    let prepared_g2_async = prepared_g2.clone();
+    let prepared_bls_pk_async = prepared_bls_pk.clone();
+    tasks.push(tokio::spawn(async move { prepare_and_pair(sk_li_by_tau, &prepared_g2_async, &prepared_bls_pk_async, li_by_tau) }));
+
     for i in 0..n {
-        if prepare_and_pair(pk.sk_li_by_z[i], &prepared_g2, &prepared_bls_pk, helper.li_by_z[i]) == false {
+        let sk_li_by_z = pk.sk_li_by_z[i];
+        let li_by_z = helper.li_by_z[i][pk.id];
+        let prepared_g2_async = prepared_g2.clone();
+        let prepared_bls_pk_async = prepared_bls_pk.clone();
+        
+        tasks.push(tokio::spawn(async move { prepare_and_pair(sk_li_by_z, &prepared_g2_async, &prepared_bls_pk_async, li_by_z) }));
+    }
+
+    for task in tasks {
+        if task.await.unwrap() == false {
             return false;
         }
     }

@@ -5,10 +5,10 @@ use ark_serialize::CanonicalDeserialize;
 use crate::api::types::{Encrypt, EncryptRequest};
 
 impl EncryptRequest {
-    pub fn deserialize(proto: EncryptRequest) -> Option<Encrypt> {
+    pub fn deserialize(self) -> Option<Encrypt> {
         let mut pks = Vec::new();
         // println!("len: {}", proto.pks.len());
-        for (idx, pk) in proto.pks.iter().enumerate() {
+        for (idx, pk) in self.pks.iter().enumerate() {
             if pk.is_empty() {
                 continue;
             }
@@ -23,10 +23,10 @@ impl EncryptRequest {
         
         Option::from(
             Encrypt {
-                msg: proto.msg,
+                msg: self.msg,
                 pks,
-                t: proto.t as usize,
-                n: proto.n as usize
+                t: self.t as usize,
+                n: self.n as usize
             }
         )
     }

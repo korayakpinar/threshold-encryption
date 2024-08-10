@@ -4,6 +4,7 @@ use ark_serialize::Read;
 use clap::{arg, command, Parser};
 use silent_threshold::kzg::UniversalParams;
 use silent_threshold::setup::SecretKey;
+use silent_threshold::utils::LagrangePolyHelper;
 use std::fs::File;
 use std::io::Cursor;
 
@@ -41,7 +42,7 @@ async fn main() -> std::io::Result<()> {
         file.read_to_end(&mut contents).expect("can't read transcript.json to a string");
 
         let mut cursor = Cursor::new(contents);
-        kzg_setup = CanonicalDeserialize::deserialize_compressed(&mut cursor).expect("Unable to deserialize kzg_setup");
+        kzg_setup = UniversalParams::<E>::deserialize_compressed(&mut cursor).expect("Unable to deserialize kzg_setup");
         println!("powers_of_g: {}, powers_of_h: {}", kzg_setup.powers_of_g.len(), kzg_setup.powers_of_h.len());
     }
 
@@ -51,8 +52,40 @@ async fn main() -> std::io::Result<()> {
         let mut contents = Vec::new();
         file.read_to_end(&mut contents).expect("Can't read the file!");
         let mut cursor = Cursor::new(contents);
-        sk = CanonicalDeserialize::deserialize_compressed(&mut cursor).expect("Unable to deserialize the data!");
+        sk = SecretKey::<E>::deserialize_compressed(&mut cursor).expect("Unable to deserialize the data!");
     }
+
+    /*let mut lagrange_helpers = Vec::new();
+    {
+        let lagrange_paths = std::fs::read_dir("./lagrangehelpers").unwrap();
+        for path in lagrange_paths {
+            let p = path.unwrap().path();
+            
+            let mut file = File::open(format!("./lagrangehelpers/{}", p.to_str().unwrap())).unwrap();
+            let mut contents = Vec::new();
+            file.read_to_end(&mut contents).expect("Can't read the file!");
+            let mut cursor = Cursor::new(contents);
+
+            let lagrange = LagrangePolyHelper::deserialize_compressed(&mut cursor).unwrap();
+            lagrange_helpers.push(lagrange);
+        }
+    }
+
+    let mut is_valid_helpers = Vec::new();
+    {
+        let lagrange_paths = std::fs::read_dir("./isvalidhelpers").unwrap();
+        for path in lagrange_paths {
+            let p = path.unwrap().path();
+            
+            let mut file = File::open(format!("./isvalidhelpers/{}", p.to_str().unwrap())).unwrap();
+            let mut contents = Vec::new();
+            file.read_to_end(&mut contents).expect("Can't read the file!");
+            let mut cursor = Cursor::new(contents);
+
+            let is_valid_helper = LagrangePolyHelper::deserialize_compressed(&mut cursor).unwrap();
+            is_valid_helpers.push(is_valid_helper);
+        }
+    }*/
 
     let data = web::Data::new(Data { kzg_setup, sk });
 

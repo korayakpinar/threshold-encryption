@@ -20,7 +20,7 @@ pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptRequest>) 
     let datum = config.app_data::<Data>().unwrap();
     let kzg_setup = datum.clone().kzg_setup;
 
-    let params_res = DecryptRequest::deserialize(data.0);
+    let params_res = data.0.deserialize();
     if params_res.is_none() {
         log::error!("can't deserialize decrypt params");
         return HttpResponse::BadRequest().finish();
@@ -54,7 +54,7 @@ pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptRequest>) 
         .map(|j| lagrange_poly(params.n, j))
         .collect();
 
-    pks.insert(0, sk_zero.get_pk(0, &kzg_setup, params.n, &lagrange_polys));
+    pks.insert(0, sk_zero.get_pk(0, &kzg_setup, params.n, &lagrange_polys).await);
 
     //println!("{:#?}, {:#?}, {:#?}, {}, {}", partial_decryptions, partial_decryptions.len(), params.parts.len(), params.t, params.n);
 

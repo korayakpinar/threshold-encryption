@@ -5,14 +5,14 @@ use ark_poly::univariate::DensePolynomial;
 use ark_std::Zero;
 use rand::rngs::OsRng;
 use silent_threshold::{
-    api::types::{E, G2}, decryption::{agg_dec, is_valid}, encryption::encrypt, kzg::{UniversalParams, KZG10}, setup::{AggregateKey, PublicKey, SecretKey}, utils::{lagrange_poly, IsValidHelper}
+    api::types::{E, G2}, decryption::agg_dec, encryption::encrypt, kzg::{UniversalParams, KZG10}, setup::{AggregateKey, PublicKey, SecretKey}, utils::lagrange_poly
 };
 
 type UniPoly381 = DensePolynomial<<E as Pairing>::ScalarField>;
 
 #[tokio::main]
 async fn main() {
-    let n = 64; // actually n-1 total parties. one party is a dummy party that is always true
+    let n = 128; // actually n-1 total parties. one party is a dummy party that is always true
     let k: usize = 64;
     let t: usize = 32;
     debug_assert!(t < n);
@@ -27,34 +27,22 @@ async fn main() {
         .map(|j| lagrange_poly(n, j))
         .collect();
 
-    // let helper = IsValidHelper::new(n, &lagrange_polys, &params);
-
-    // create the dummy party's keys
     sk.push(SecretKey::<E>::new(&mut rng));
     sk[0].nullify();
-    pk.push(sk[0].get_pk(0, &params, n, &lagrange_polys));
-
-    /*let ti = time::Instant::now();
-    if is_valid(pk[0].clone(), n, &params, &helper[0]) {
-        println!("{:#?}: {} is valid", ti.elapsed(), 0);
-    }*/
+    pk.push(sk[0].get_pk(0, &params, n, &lagrange_polys).await);
 
     for i in 1..k {
         sk.push(SecretKey::<E>::new(&mut rng));
+        
+        
         let t = time::Instant::now();
-        pk.push(sk[i].get_pk(i, &params, n, &lagrange_polys));
-        println!("{:#?}: pk[{}]", t.elapsed(), i);
-
-        //let t = time::Instant::now();
-        //if is_valid(pk[i].clone(), n, &params, &helper[i]) {
-        //    println!("{:#?}: {} is valid", t.elapsed(), i);
-        //}
+        pk.push(tokio::join!(sk[i].get_pk(i, &params, n, &lagrange_polys)).0);
+        println!("{:#?}: {} is valid", t.elapsed(), i);
     }
 
     let agg_key = AggregateKey::<E>::new(pk.clone(), n, &params);
     let ct = encrypt::<E>(&agg_key, t, &params);
 
-    // compute partial decryptions
     let mut partial_decryptions: Vec<G2> = Vec::new();
     let mut selector: Vec<bool> = Vec::new();
 
@@ -69,7 +57,6 @@ async fn main() {
             selector.push(false)
         }
     }
-    // println!("parts: {:#?}\nselector: {:#?}", partial_decryptions, selector);
 
     let ti = time::Instant::now();
     let _dec_key = agg_dec(&partial_decryptions, &ct.sa1, &ct.sa2, t, n, &selector, &agg_key, &params).await;

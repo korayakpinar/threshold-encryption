@@ -6,7 +6,7 @@ use silent_threshold::{kzg::KZG10, setup::SecretKey, utils::lagrange_poly};
 type E = ark_bls12_381::Bls12_381;
 type UniPoly381 = DensePolynomial<<E as Pairing>::ScalarField>;
 
-fn bench_setup(c: &mut Criterion) {
+async fn bench_setup(c: &mut Criterion) {
     let mut group = c.benchmark_group("setup");
     group.sample_size(10);
     let mut rng = ark_std::test_rng();
@@ -21,7 +21,7 @@ fn bench_setup(c: &mut Criterion) {
             .collect();
 
         group.bench_with_input(BenchmarkId::from_parameter(n), &params, |b, inp| {
-            b.iter(|| sk.get_pk(0, &inp, n, &lagrange_polys));
+            b.iter(|| sk.get_pk(0, &inp, n, lagrange_polys.clone()).await);
         });
     }
 

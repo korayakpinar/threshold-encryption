@@ -1,11 +1,11 @@
 use crate::api::types::{PKRequest, PK};
 
 impl PKRequest {
-    pub fn deserialize(proto: PKRequest) -> Option<PK> {
+    pub fn deserialize(self) -> Option<PK> {
         return Option::from(
             PK {
-                id: proto.id as usize,
-                n: proto.n as usize
+                id: self.id as usize,
+                n: self.n as usize
             }
         )
     }

@@ -20,7 +20,7 @@ pub async fn encrypt_route(config: HttpRequest, data: ProtoBuf<EncryptRequest>) 
     let datum = config.app_data::<Data>().unwrap();
     let kzg_setup = datum.kzg_setup.clone();
 
-    let encrypt_data_res = EncryptRequest::deserialize(data.0);
+    let encrypt_data_res = data.0.deserialize();
     if encrypt_data_res.is_none() {
         log::error!("can't deserialize encrypt_data");
         return HttpResponse::BadRequest().finish();
@@ -37,7 +37,7 @@ pub async fn encrypt_route(config: HttpRequest, data: ProtoBuf<EncryptRequest>) 
 
     let mut sk_zero: SecretKey<E> = SecretKey::new(&mut rng);
     sk_zero.nullify();
-    pks.insert(0, sk_zero.get_pk(0, &kzg_setup, encrypt_data.n, &lagrange_polys));
+    pks.insert(0, sk_zero.get_pk(0, &kzg_setup, encrypt_data.n, &lagrange_polys).await);
 
     let aggregated = AggregateKey::<E>::new(pks, encrypt_data.n, &kzg_setup);
     let ct = encrypt(&aggregated, encrypt_data.t, &kzg_setup);

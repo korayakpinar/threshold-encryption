@@ -7,6 +7,11 @@ message VerifyPartRequest {
     bytes part_dec = 3;
 }
 
+message IsValidRequest {
+    bytes pk = 1;
+    uint64 n = 2;
+}
+
 message DecryptRequest {
     bytes enc = 1;
     repeated bytes pks = 2;

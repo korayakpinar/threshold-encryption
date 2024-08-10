@@ -28,18 +28,18 @@ async fn main() {
     // create the dummy party's keys
     sk.push(SecretKey::<E>::new(&mut rng));
     sk[0].nullify();
-    pk.push(sk[0].get_pk(0, &params, n, &lagrange_polys));
+    pk.push(sk[0].get_pk(0, &params, n, &lagrange_polys).await);
 
     for _ in 1..9 {
         sk.push(SecretKey::<E>::new(&mut rng));
     }
 
     for i in 1..9 {
-        pk.push(sk[1].get_pk(i, &params, n, &lagrange_polys));
+        pk.push(sk[1].get_pk(i, &params, n, &lagrange_polys).await);
     }
 
     for i in 9..16 {
-        pk.push(sk[i - 7].get_pk(i, &params, n, &lagrange_polys));
+        pk.push(sk[i - 7].get_pk(i, &params, n, &lagrange_polys).await);
     }
 
     let agg_key = AggregateKey::<E>::new(pk.clone(), n, &params);

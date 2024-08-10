@@ -11,6 +11,7 @@ use block_modes::block_padding::Pkcs7;
 use crate::encryption::Ciphertext;
 use crate::kzg::UniversalParams;
 use crate::setup::{PublicKey, SecretKey};
+use crate::utils::{IsValidHelper, LagrangePolyHelper};
 
 use prost::{self, Message};
 
@@ -22,7 +23,25 @@ pub type Aes256Cbc = Cbc<Aes256, Pkcs7>;
 #[derive(Clone)]
 pub struct Data {
     pub kzg_setup: UniversalParams<E>,
-    pub sk: SecretKey<E>
+    pub sk: SecretKey<E>,
+    // pub lagrange_helpers: Vec<LagrangePolyHelper>,
+    // pub is_valid_helpers: Vec<IsValidHelper>
+}
+
+// IsValid
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct IsValid {
+    pub pk: PublicKey<E>,
+    pub n: usize
+}
+
+#[derive(Clone, Eq, PartialEq, Message)]
+pub struct IsValidRequest {
+    #[prost(bytes, tag="1")]
+    pub pk: Vec<u8>,
+    #[prost(uint64, tag="2")]
+    pub n: u64
 }
 
 // VerifyPart
