@@ -25,6 +25,9 @@ struct Args {
     /// Port to start the api
     #[arg(short, long, default_value_t = 8080)]
     api_port: u16,
+
+    #[arg(short, long, default_value_t = false)]
+    test: bool
 }
 
 
@@ -41,9 +44,10 @@ async fn main() -> std::io::Result<()> {
         let mut contents = Vec::new();
         file.read_to_end(&mut contents).expect("can't read transcript.json to a string");
 
-        let mut cursor = Cursor::new(contents);
-        kzg_setup = UniversalParams::<E>::deserialize_compressed(&mut cursor).expect("Unable to deserialize kzg_setup");
+        let cursor = Cursor::new(contents);
+        kzg_setup = UniversalParams::<E>::deserialize_compressed(cursor).expect("Unable to deserialize kzg_setup");
         println!("powers_of_g: {}, powers_of_h: {}", kzg_setup.powers_of_g.len(), kzg_setup.powers_of_h.len());
+        drop(file);
     }
 
     let sk: SecretKey<E>;
@@ -51,43 +55,40 @@ async fn main() -> std::io::Result<()> {
         let mut file = File::open(args.bls_key).expect("Can't open the file!");
         let mut contents = Vec::new();
         file.read_to_end(&mut contents).expect("Can't read the file!");
-        let mut cursor = Cursor::new(contents);
-        sk = SecretKey::<E>::deserialize_compressed(&mut cursor).expect("Unable to deserialize the data!");
+        let cursor = Cursor::new(contents);
+        sk = SecretKey::<E>::deserialize_compressed(cursor).expect("Unable to deserialize the data!");
+        drop(file);
     }
 
-    /*let mut lagrange_helpers = Vec::new();
-    {
+    let mut lagrange_helpers = Vec::new();
+    if !args.test {
         let lagrange_paths = std::fs::read_dir("./lagrangehelpers").unwrap();
         for path in lagrange_paths {
             let p = path.unwrap().path();
             
-            let mut file = File::open(format!("./lagrangehelpers/{}", p.to_str().unwrap())).unwrap();
+            let mut file = File::open(p.to_str().unwrap()).unwrap();
             let mut contents = Vec::new();
             file.read_to_end(&mut contents).expect("Can't read the file!");
-            let mut cursor = Cursor::new(contents);
+            let cursor = Cursor::new(contents);
 
-            let lagrange = LagrangePolyHelper::deserialize_compressed(&mut cursor).unwrap();
+            let lagrange = LagrangePolyHelper::deserialize_compressed(cursor).unwrap();
             lagrange_helpers.push(lagrange);
+            log::info!("{}", p.to_str().unwrap());
+            drop(file);
         }
+    } else {
+        let mut file = File::open("./lagrangehelpers/2").unwrap();
+        let mut contents = Vec::new();
+        file.read_to_end(&mut contents).expect("Can't read the file!");
+        let cursor = Cursor::new(contents);
+
+        let lagrange = LagrangePolyHelper::deserialize_compressed(cursor).unwrap();
+        lagrange_helpers.push(lagrange);
+        drop(file);
     }
+    
 
-    let mut is_valid_helpers = Vec::new();
-    {
-        let lagrange_paths = std::fs::read_dir("./isvalidhelpers").unwrap();
-        for path in lagrange_paths {
-            let p = path.unwrap().path();
-            
-            let mut file = File::open(format!("./isvalidhelpers/{}", p.to_str().unwrap())).unwrap();
-            let mut contents = Vec::new();
-            file.read_to_end(&mut contents).expect("Can't read the file!");
-            let mut cursor = Cursor::new(contents);
-
-            let is_valid_helper = LagrangePolyHelper::deserialize_compressed(&mut cursor).unwrap();
-            is_valid_helpers.push(is_valid_helper);
-        }
-    }*/
-
-    let data = web::Data::new(Data { kzg_setup, sk });
+    let data = web::Data::new(Data { kzg_setup, sk, lagrange_helpers });
 
     log::info!("starting HTTP server at http://localhost:{}", args.api_port);
     HttpServer::new(move || {

@@ -225,7 +225,7 @@ func main() {
 		_, err = file.Read(z)
 		for w := 0; w < len(pk); w++ {
 			if pk[w] != z[w] {
-				fmt.Printf("pk[%d] is wrong\n", w)
+				fmt.Printf("pk[%d] is wrong, %d, %d\n", w, pk[w], z[w])
 				os.Exit(1)
 			}
 		}

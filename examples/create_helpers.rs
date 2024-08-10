@@ -68,7 +68,7 @@ async fn main() {
         .map(|j| lagrange_poly(args.n, j))
         .collect();
 
-    let mut file = File::open(format!("transcript-{}", args.n)).await.expect("Can't open the file!");
+    let mut file = File::open("transcript-512").await.expect("Can't open the file!");
     let mut contents = Vec::new();
     let _ = file.read_to_end(&mut contents).await;
     println!("{}", contents.len());
@@ -90,12 +90,12 @@ async fn main() {
     let pk_exp = get_pk_exp(&sk, 0, args.n, &lagrange_helper);
     println!("elapsed for experimental pk: {:#?}", t.elapsed());
 
-    let t = time::Instant::now();
+/*     let t = time::Instant::now();
     let is_valid_helper = IsValidHelper::new(args.n).await;
     println!("Elapsed: {:#?}", t.elapsed());
 
     println!("{}", is_valid(&pk, args.n, &kzg_setup, &is_valid_helper).await);
-    println!("{}", is_valid(&pk_exp, args.n, &kzg_setup, &is_valid_helper).await);
+    println!("{}", is_valid(&pk_exp, args.n, &kzg_setup, &is_valid_helper).await); */
     println!("{}", is_equal(&pk, &pk_exp));
 
     if !Path::new("./lagrangehelpers").exists() {
@@ -112,8 +112,8 @@ async fn main() {
         fs::create_dir("./isvalidhelpers").unwrap();
     }
 
-    let mut file = File::create(format!("./isvalidhelpers/{}", args.n)).await.expect("Can't open the file");
+/*     let mut file = File::create(format!("./isvalidhelpers/{}", args.n)).await.expect("Can't open the file");
     let mut wr = Vec::new();
     is_valid_helper.serialize_compressed(&mut wr).unwrap();
-    file.write_all(&wr).await.expect("Can't write to the file!");
+    file.write_all(&wr).await.expect("Can't write to the file!"); */
 }

@@ -29,6 +29,10 @@ fn main() {
         panic!("n should be a power of two");
     }
 
+    if args.n == 512 {
+        panic!("can't use 512 for comittee size");
+    }
+
     let mut rng = OsRng;
     let kzg_setup: UniversalParams<E> = KZG10::<E, UniPoly381>::setup(args.n, &mut rng).unwrap();
 

@@ -1,20 +1,16 @@
 use actix_protobuf::{ProtoBuf, ProtoBufResponseBuilder};
 use actix_web::{HttpRequest, HttpResponse};
 
-use ark_ec::bls12::Bls12;
-use ark_ec::pairing::Pairing;
-use ark_poly::univariate::DensePolynomial;
-
+use ark_std::log2;
 use rand::Rng;
 use rand::rngs::OsRng;
 use sha2::{Sha256, Digest};
 use block_modes::BlockMode;
 
 use crate::encryption::encrypt;
-use crate::setup::{AggregateKey, SecretKey};
+use crate::setup::{get_pk_exp, AggregateKey, SecretKey};
 
 use crate::api::types::*;
-use crate::utils::lagrange_poly;
 
 pub async fn encrypt_route(config: HttpRequest, data: ProtoBuf<EncryptRequest>) -> HttpResponse {
     let datum = config.app_data::<Data>().unwrap();
@@ -31,13 +27,12 @@ pub async fn encrypt_route(config: HttpRequest, data: ProtoBuf<EncryptRequest>) 
 
     let mut rng = OsRng;
     
-    let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>> = (0..encrypt_data.n)
-        .map(|j| lagrange_poly(encrypt_data.n, j))
-        .collect();
+    let l = log2(encrypt_data.n) as usize - 1;
+    let lagrange_helper = &datum.lagrange_helpers[l];
 
     let mut sk_zero: SecretKey<E> = SecretKey::new(&mut rng);
     sk_zero.nullify();
-    pks.insert(0, sk_zero.get_pk(0, &kzg_setup, encrypt_data.n, &lagrange_polys).await);
+    pks.insert(0, get_pk_exp(&sk_zero, 0, encrypt_data.n, &lagrange_helper));
 
     let aggregated = AggregateKey::<E>::new(pks, encrypt_data.n, &kzg_setup);
     let ct = encrypt(&aggregated, encrypt_data.t, &kzg_setup);
