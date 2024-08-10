@@ -4,9 +4,6 @@ venv/
 __pycache__/
 .vscode/
 keys/
-transcript*
-isvalidhelpers/
-lagrangehelpers/
 parts/
 pks/
 sks/
