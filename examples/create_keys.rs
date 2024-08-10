@@ -66,7 +66,7 @@ async fn main() {
     let is_valid_helper = IsValidHelper::deserialize_compressed(cur).unwrap();
     drop(file);
     
-    let mut file = File::open("transcript").unwrap();
+    let mut file = File::open(format!("transcript-{}", args.n)).unwrap();
     let mut contents = Vec::new();
     let _ = file.read_to_end(&mut contents);
     let cur = Cursor::new(contents);

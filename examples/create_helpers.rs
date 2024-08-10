@@ -83,11 +83,11 @@ async fn main() {
     println!("Elapsed: {:#?}", t.elapsed());
 
     let t = time::Instant::now();
-    let pk = sk.get_pk(3, &kzg_setup, args.n, &lagrange_polys).await;
+    let pk = sk.get_pk(0, &kzg_setup, args.n, &lagrange_polys).await;
     println!("elapsed for normal pk: {:#?}", t.elapsed());
     
     let t = time::Instant::now();
-    let pk_exp = get_pk_exp(&sk, 3, args.n, &lagrange_helper);
+    let pk_exp = get_pk_exp(&sk, 0, args.n, &lagrange_helper);
     println!("elapsed for experimental pk: {:#?}", t.elapsed());
 
     let t = time::Instant::now();
