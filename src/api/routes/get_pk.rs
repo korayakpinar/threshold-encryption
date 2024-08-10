@@ -1,31 +1,29 @@
 use actix_protobuf::{ProtoBuf, ProtoBufResponseBuilder};
 use actix_web::{HttpRequest, HttpResponse};
 
-use ark_ec::bls12::Bls12;
-use ark_ec::pairing::Pairing;
-use ark_poly::univariate::DensePolynomial;
 use ark_serialize::*;
+use ark_std::log2;
 
 use crate::api::types::*;
-use crate::utils::lagrange_poly;
+use crate::setup::get_pk_exp;
+
 
 pub async fn get_pk_route(config: HttpRequest, data: ProtoBuf<PKRequest>) -> HttpResponse {
     let datum = config.app_data::<Data>().unwrap();
     let sk = &datum.sk;
-    let params = &datum.kzg_setup;
+    // let params = &datum.kzg_setup;
 
-    let pk_res = PKRequest::deserialize(data.0);
+    let pk_res = data.0.deserialize();
     if pk_res.is_none() {
         log::error!("can't deserialize pk request");
         return HttpResponse::InternalServerError().finish();
     }
     let pk = pk_res.unwrap();
 
-    let lagrange_polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>> = (0..pk.n)
-        .map(|j| lagrange_poly(pk.n, j))
-        .collect();
+    let l = log2(pk.n) as usize - 1;
+    let lagrange_helper = &datum.lagrange_helpers[l];
 
-    let pk = sk.get_pk(pk.id + 1, params, pk.n, &lagrange_polys);
+    let pk = get_pk_exp(sk, pk.id + 1, pk.n, &lagrange_helper);
     
     let mut result = Vec::new();
     let res = pk.serialize_compressed(&mut result);

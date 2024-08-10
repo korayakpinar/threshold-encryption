@@ -5,8 +5,8 @@ use ark_serialize::CanonicalDeserialize;
 use crate::api::types::{VerifyPart, VerifyPartRequest};
 
 impl VerifyPartRequest {
-    pub fn deserialize(proto: VerifyPartRequest) -> Option<VerifyPart> {
-        let mut cur = Cursor::new(proto.gamma_g2);
+    pub fn deserialize(self) -> Option<VerifyPart> {
+        let mut cur = Cursor::new(self.gamma_g2);
         let mut tmp_g2 = CanonicalDeserialize::deserialize_compressed(cur);
         if tmp_g2.is_err() {
             log::error!("can't read gamma_g2");
@@ -14,7 +14,7 @@ impl VerifyPartRequest {
         }
         let gamma_g2 = tmp_g2.unwrap();
     
-        cur = Cursor::new(proto.pk);
+        cur = Cursor::new(self.pk);
         let tmp_pk = CanonicalDeserialize::deserialize_compressed(cur);
         if tmp_pk.is_err() {
             log::error!("can't read pk");
@@ -22,7 +22,7 @@ impl VerifyPartRequest {
         }
         let pk = tmp_pk.unwrap();
     
-        cur = Cursor::new(proto.part_dec);
+        cur = Cursor::new(self.part_dec);
         tmp_g2 = CanonicalDeserialize::deserialize_compressed(cur);
         if tmp_g2.is_err() {
             log::error!("can't read part_dec");

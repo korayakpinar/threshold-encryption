@@ -17,16 +17,15 @@ aes = "0.7"
 block-modes = "0.8"
 block-padding = "0.2"
 sha2 = "0.10"
-generic-array = "0.14"
 rand = "0.8"
 log = "0.4.21"
 env_logger = "0.11.3"
-serde_json = "1.0.118"
 prost = { version = "0.12.6", features = ["prost-derive"] }
 prost-types = "0.12.6"
 actix-protobuf = "0.10.0"
 hex = "0.4.3"
 clap = { version = "4.5.8", features = ["derive", "env", "wrap_help", "cargo"] }
+tokio = { version = "1.39.2", features = ["full"] }
 
 [features]
 asm = [ "ark-ff/asm" ]

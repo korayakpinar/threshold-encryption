@@ -1,14 +1,14 @@
-#![allow(non_snake_case, unused_variables)]
-use std::io::Cursor;
-
-use ark_bls12_381::{G1Affine, G2Affine};
+use ark_ec::{bls12::Bls12, pairing::Pairing};
 use ark_ff::{FftField, Field};
 use ark_poly::{
     univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, Evaluations, Polynomial,
     Radix2EvaluationDomain,
 };
-use serde::{Deserialize, Serialize};
-use ark_serialize::*;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::Zero;
+use std::{ops::{Mul, Sub}, sync::Once, time};
+
+use crate::{api::types::{E, G1, G2}, kzg::{UniversalParams, KZG10}, setup::SecretKey};
 
 // 1 at omega^i and 0 elsewhere on domain {omega^i}_{i \in [n]}
 pub fn lagrange_poly<F: FftField>(n: usize, i: usize) -> DensePolynomial<F> {
@@ -49,65 +49,283 @@ pub fn interp_mostly_zero<F: Field>(eval: F, points: &Vec<F>) -> DensePolynomial
     interp
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Powers {
-    pub G1Powers: Vec<String>,
-    pub G2Powers: Vec<String>
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct IsValidHelper {
+    pub li: Vec<G2>,
+    pub li_minus0: Vec<G2>,
+    pub li_by_tau: Vec<G2>,
+    pub li_by_z: Vec<Vec<G2>>
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Witness {
-    pub runningProducts: Vec<String>,
-    pub potPubkeys: Vec<String>,
-    pub blsSignatures: Vec<String>
-}
+impl IsValidHelper {
+    pub async fn new(n: usize) -> Self {
+        let domain = Radix2EvaluationDomain::<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>::new(n).unwrap();
 
-#[derive(Serialize, Deserialize)]
-pub struct Transcript {
-    pub numG1Powers: u32,
-    pub numG2Powers: u32,
-    pub powersOfTau: Powers,
-    pub witness: Witness
-}
+        let mut tasks = Vec::new();
+        let mut li_by_z_times_li_tasks = Vec::new();
 
-#[derive(Serialize, Deserialize)]
-pub struct KZG {
-    pub transcripts: Vec<Transcript>
-}
+        for id in 0..n {
+            let li_task = tokio::spawn(async move {
+                let li: G2 = KZG10::commit_g2(&get_kzg_setup(), &get_lagrange_polys()[id].to_owned())
+                    .expect("commitment failed")
+                    .into();
+                
+                li
+            });
+            tasks.push(li_task);
 
-pub fn convert_hex_to_g1(g1_powers: &Vec<String>) -> Vec<G1Affine> {
-    let mut g1_powers_decompressed = Vec::new();
+            let li_minus0_task = tokio::spawn(async move {
+                let mut f = get_lagrange_polys()[id].to_owned();
+                f.coeffs[0] = <Bls12<ark_bls12_381::Config> as Pairing>::ScalarField::zero();
+                let li_minus0 = KZG10::commit_g2(&get_kzg_setup(), &f)
+                    .expect("commitment failed")
+                    .into();
 
-    let mut j = 0;
-    let len = g1_powers.len();
-    for i in g1_powers {
-        let g1_vec: Vec<u8> = hex::decode(i.clone().split_off(2)).unwrap();
-        let mut cur = Cursor::new(g1_vec);
-        let g1 = G1Affine::deserialize_compressed(&mut cur).unwrap();
-        g1_powers_decompressed.push(g1);
-        // print!("{}/{}\t\r", j, len);
-        // println!("{:#?}", g1);
-        j += 1;
+                li_minus0
+            });
+            tasks.push(li_minus0_task);
+
+            let li_by_tau_task = tokio::spawn(async move {
+                let f: DensePolynomial<<E as Pairing>::ScalarField> = DensePolynomial::from_coefficients_vec(get_lagrange_polys()[id].coeffs[1..].to_vec());
+                let li_by_tau_task = KZG10::commit_g2(&get_kzg_setup(), &f)
+                    .expect("commitment failed")
+                    .into();
+
+                li_by_tau_task
+            });
+            tasks.push(li_by_tau_task);
+
+            // let c = sk.clone();
+            for j in 0..n {
+                if j == id {
+                    let li_by_z_task = tokio::spawn(async move {
+                        let li = &get_lagrange_polys()[id];
+                        let l = li.mul(li).sub(li);
+        
+                        let f = l.divide_by_vanishing_poly(domain).unwrap().0;
+        
+                        let li_by_z = KZG10::commit_g2(&get_kzg_setup(), &f)
+                            .expect("commitment failed")
+                            .into();
+        
+                        li_by_z
+                    });
+                    li_by_z_times_li_tasks.push(li_by_z_task);
+                    continue;
+                }
+
+                let li_by_z_times_li_task = tokio::spawn(async move {
+                    let li = &get_lagrange_polys()[id];
+                    let li_j = &get_lagrange_polys()[j];
+                    let l = li_j.mul(li);
+
+                    let f = l.divide_by_vanishing_poly(domain).unwrap().0;
+
+                    let li_by_z_times_li = KZG10::commit_g2(&get_kzg_setup(), &f)
+                        .expect("commitment failed")
+                        .into();
+
+                    li_by_z_times_li
+                });
+                li_by_z_times_li_tasks.push(li_by_z_times_li_task)
+            }
+        }
+
+        let mut ret = Self {
+                                                    li: Vec::new(),
+                                                    li_minus0: Vec::new(),
+                                                    li_by_tau: Vec::new(),
+                                                    li_by_z: Vec::new(),
+                                            };
+
+        for (idx, task) in tasks.into_iter().enumerate() {
+            let t = time::Instant::now();
+            match idx % 3 {
+                0 => ret.li.push(task.await.unwrap()),
+                1 => ret.li_minus0.push(task.await.unwrap()),
+                2 => ret.li_by_tau.push(task.await.unwrap()),
+                // 3 => li_by_z.push(task.await.unwrap()),
+                //4 => ret.li_by_z_times_li.push(task.await.unwrap()* sk.sk),
+                _ => unreachable!()
+            }
+            println!("tasks: {} - {:#?}", idx, t.elapsed());
+        }
+
+        let mut li_by_z_times_li = Vec::new();
+        let mut tmp = Vec::new();
+        for (idx, task) in li_by_z_times_li_tasks.into_iter().enumerate() {
+            let t = time::Instant::now();
+            if idx % n == 0 && idx != 0 {
+                li_by_z_times_li.push(tmp.to_owned());
+                tmp.clear()
+            }
+            tmp.push(task.await.unwrap());
+            println!("tasks_z: {} - {:#?}", idx, t.elapsed());
+        }
+        li_by_z_times_li.push(tmp.to_owned());
+        ret.li_by_z = li_by_z_times_li;
+        
+        ret
     }
-    // print!("\n");
-
-    g1_powers_decompressed
 }
 
-pub fn convert_hex_to_g2(g2_powers: &Vec<String>) -> Vec<G2Affine> {
-    let mut g2_powers_decompressed = Vec::new();
-    let mut j = 0;
-    let len = g2_powers.len();
-    for i in g2_powers {
-        let g2_powers: Vec<u8> = hex::decode(i.clone().split_off(2)).unwrap();
-        let mut cur = Cursor::new(g2_powers);
-        let g2 = G2Affine::deserialize_compressed(&mut cur).unwrap();
-        g2_powers_decompressed.push(g2);
-        // print!("{}/{}\t\r", j, len);
-        // println!("{:#?}", g2);
-        j += 1;
-    }
-    // print!("\n");
+static mut LAGRANGE_POLYS: Option<&'static [DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>]> = None;
+static LAGRANGE_INIT: Once = Once::new();
 
-    g2_powers_decompressed
+static mut KZG_SETUP: Option<UniversalParams<E>> = None;
+static KZG_INIT: Once = Once::new();
+
+fn initialize_lagrange_polys(n: usize) {
+    let polys: Vec<DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>> = (0..n)
+        .map(|j| lagrange_poly(n, j))
+        .collect();
+    unsafe {
+        LAGRANGE_POLYS = Some(Box::leak(polys.into_boxed_slice()));
+    }
+}
+
+fn get_lagrange_polys() -> &'static [DensePolynomial<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>] {
+    unsafe {
+        LAGRANGE_POLYS.expect("LAGRANGE_POLYS has not been initialized")
+    }
+}
+
+fn initialize_kzg_setup(kzg_setup: UniversalParams<E>) {
+    unsafe {
+        KZG_SETUP = Some(kzg_setup);
+    }
+}
+
+fn get_kzg_setup() -> &'static UniversalParams<E> {
+    unsafe {
+        KZG_SETUP.as_ref().expect("KZG_SETUP has not been initialized")
+    }
+}
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct LagrangePolyHelper {
+    pub li: Vec<G1>,
+    pub li_minus0: Vec<G1>,
+    pub li_by_tau: Vec<G1>,
+    pub li_by_z: Vec<Vec<G1>>,
+}
+
+impl LagrangePolyHelper {
+    pub async fn new(_sk: &SecretKey<E>, n: usize, params: &UniversalParams<E>) -> Self {
+        let domain = Radix2EvaluationDomain::<<Bls12<ark_bls12_381::Config> as Pairing>::ScalarField>::new(n).unwrap();
+
+        KZG_INIT.call_once(|| {
+            initialize_kzg_setup(params.to_owned());
+        });
+
+        LAGRANGE_INIT.call_once(|| {
+            initialize_lagrange_polys(n);
+        });
+
+        let mut tasks = Vec::new();
+        let mut li_by_z_times_li_tasks = Vec::new();
+
+        for id in 0..n {
+            let li_task = tokio::spawn(async move {
+                let li: G1 = KZG10::commit_g1(&get_kzg_setup(), &get_lagrange_polys()[id].to_owned())
+                    .expect("commitment failed")
+                    .into();
+                
+                li
+            });
+            tasks.push(li_task);
+
+            let li_minus0_task = tokio::spawn(async move {
+                let mut f = get_lagrange_polys()[id].to_owned();
+                f.coeffs[0] = <Bls12<ark_bls12_381::Config> as Pairing>::ScalarField::zero();
+                let li_minus0 = KZG10::commit_g1(&get_kzg_setup(), &f)
+                    .expect("commitment failed")
+                    .into();
+
+                li_minus0
+            });
+            tasks.push(li_minus0_task);
+
+            let li_by_tau_task = tokio::spawn(async move {
+                let f: DensePolynomial<<E as Pairing>::ScalarField> = DensePolynomial::from_coefficients_vec(get_lagrange_polys()[id].coeffs[1..].to_vec());
+                let li_by_tau_task = KZG10::commit_g1(&get_kzg_setup(), &f)
+                    .expect("commitment failed")
+                    .into();
+
+                li_by_tau_task
+            });
+            tasks.push(li_by_tau_task);
+
+            // let c = sk.clone();
+            for j in 0..n {
+                if j == id {
+                    let li_by_z_task = tokio::spawn(async move {
+                        let li = &get_lagrange_polys()[id];
+                        let l = li.mul(li).sub(li);
+        
+                        let f = l.divide_by_vanishing_poly(domain).unwrap().0;
+        
+                        let li_by_z = KZG10::commit_g1(&get_kzg_setup(), &f)
+                            .expect("commitment failed")
+                            .into();
+        
+                        li_by_z
+                    });
+                    li_by_z_times_li_tasks.push(li_by_z_task);
+                    continue;
+                }
+
+                let li_by_z_times_li_task = tokio::spawn(async move {
+                    let li = &get_lagrange_polys()[id];
+                    let li_j = &get_lagrange_polys()[j];
+                    let l = li_j.mul(li);
+
+                    let f = l.divide_by_vanishing_poly(domain).unwrap().0;
+
+                    let li_by_z_times_li = KZG10::commit_g1(&get_kzg_setup(), &f)
+                        .expect("commitment failed")
+                        .into();
+
+                    li_by_z_times_li
+                });
+                li_by_z_times_li_tasks.push(li_by_z_times_li_task)
+            }
+        }
+
+        let mut ret = Self {
+                                                    li: Vec::new(),
+                                                    li_minus0: Vec::new(),
+                                                    li_by_tau: Vec::new(),
+                                                    li_by_z: Vec::new(),
+                                            };
+
+        for (idx, task) in tasks.into_iter().enumerate() {
+            let t = time::Instant::now();
+            match idx % 3 {
+                0 => ret.li.push(task.await.unwrap()),
+                1 => ret.li_minus0.push(task.await.unwrap()),
+                2 => ret.li_by_tau.push(task.await.unwrap()),
+                // 3 => li_by_z.push(task.await.unwrap()),
+                //4 => ret.li_by_z_times_li.push(task.await.unwrap()* sk.sk),
+                _ => unreachable!()
+            }
+            println!("tasks: {} - {:#?}", idx, t.elapsed());
+        }
+
+        let mut li_by_z_times_li = Vec::new();
+        let mut tmp = Vec::new();
+        for (idx, task) in li_by_z_times_li_tasks.into_iter().enumerate() {
+            let t = time::Instant::now();
+            if idx % n == 0 && idx != 0 {
+                li_by_z_times_li.push(tmp.to_owned());
+                tmp.clear()
+            }
+            tmp.push(task.await.unwrap());
+            println!("tasks_z: {} - {:#?}", idx, t.elapsed());
+        }
+        li_by_z_times_li.push(tmp.to_owned());
+        ret.li_by_z = li_by_z_times_li;
+        
+        ret
+    }
 }
