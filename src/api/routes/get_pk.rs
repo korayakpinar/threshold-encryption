@@ -14,7 +14,7 @@ pub async fn get_pk_route(config: HttpRequest, data: ProtoBuf<PKRequest>) -> Htt
     let sk = &datum.sk;
     let params = &datum.kzg_setup;
 
-    let pk_res = PKRequest::deserialize(data.0);
+    let pk_res = data.0.deserialize();
     if pk_res.is_none() {
         log::error!("can't deserialize pk request");
         return HttpResponse::InternalServerError().finish();

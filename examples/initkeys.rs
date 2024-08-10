@@ -153,7 +153,7 @@ async fn main() {
             let pk = sk.get_pk(i + 1, &kzg_setup, args.n, &lagrange_polys);
             let mut pk_file = File::create(pk_filename).await.expect("Can't write to the file!");
             let mut pk_wr = Vec::new();
-            pk.serialize_compressed(&mut pk_wr).unwrap();
+            pk.await.serialize_compressed(&mut pk_wr).unwrap();
             pk_file.write_all(&pk_wr).await.expect("Can't write to the file!");
             println!("{}-pk: {:#?}", i, t.elapsed());
         });

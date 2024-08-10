@@ -36,7 +36,7 @@ async fn main() -> std::io::Result<()> {
 
     let kzg_setup: UniversalParams<E>;
     {
-        let mut file = File::open(args.transcript).expect("can't open transcript.json");
+        let mut file = File::open(args.transcript).expect("can't open transcript");
 
         let mut contents = Vec::new();
         file.read_to_end(&mut contents).expect("can't read transcript.json to a string");
