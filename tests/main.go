@@ -239,13 +239,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	ti = time.Now()
+	/*ti = time.Now()
 	err = VerifyPart(pks[0], enc.GammaG2, part, "http://127.0.0.1:8080/verifydec")
 	fmt.Println("verifypart", time.Since(ti))
 	if err != nil {
 		fmt.Println("can't verify part", err)
 		os.Exit(1)
-	}
+	}*/
 	parts[0] = part
 
 	new_parts := make(map[uint64]([]byte))
