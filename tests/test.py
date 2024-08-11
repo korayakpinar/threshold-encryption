@@ -1,5 +1,6 @@
 import asyncio
 import subprocess
+import time
 import sys
 
 async def run_command(i, wait):
@@ -16,15 +17,20 @@ async def run_command(i, wait):
     return returncode
 
 async def main():
+    testsize = 60
     wait = 0
     if len(sys.argv) == 2:
-        wait = float(sys.argv[1])
-    tasks = [run_command(i, wait) for i in range(60)]
+        testsize = int(sys.argv[1])
+    if len(sys.argv) == 3:
+        wait = float(sys.argv[2])
+
+    tasks = [run_command(i, wait) for i in range(testsize)]
+    t = time.time()
     results = await asyncio.gather(*tasks)
     
     q = sum(1 for result in results if result == 0)
     
-    print(f"Number of successful runs: {q}")
+    print(f"Number of successful runs: {q} in {time.time() - t}s")
 
 if __name__ == "__main__":
     asyncio.run(main())

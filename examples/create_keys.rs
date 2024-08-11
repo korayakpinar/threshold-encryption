@@ -78,8 +78,6 @@ async fn main() {
 
         let lagrange_poly = LagrangePoly::new(i + 1, &lagrange_helper);
 
-        println!("{}", lagrange_poly.li_by_z.len());
-
         let pk = get_pk_exp(&sk, i + 1, &lagrange_poly);
         println!("{}-pk: {:#?}", pk.id, t.elapsed());
         let mut pk_wr = Vec::new();
