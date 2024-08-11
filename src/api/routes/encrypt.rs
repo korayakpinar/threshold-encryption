@@ -15,6 +15,7 @@ use crate::encryption::encrypt;
 use crate::setup::{get_pk_exp, AggregateKey, SecretKey};
 
 use crate::api::types::*;
+use crate::utils::LagrangePoly;
 
 pub async fn encrypt_route(config: HttpRequest, data: ProtoBuf<EncryptRequest>) -> HttpResponse {
     unsafe { libc::malloc_trim(0); }

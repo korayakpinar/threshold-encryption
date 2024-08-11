@@ -50,6 +50,27 @@ pub fn interp_mostly_zero<F: Field>(eval: F, points: &Vec<F>) -> DensePolynomial
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct IsValidPoly {
+    pub li: G2,
+    pub li_minus0: G2,
+    pub li_by_tau: G2,
+    pub li_by_z: Vec<G2>,
+}
+
+impl IsValidPoly {
+    pub fn new(idx: usize, polys: &IsValidHelper) -> Self {
+        Self {
+            li: polys.li[idx],
+            li_minus0: polys.li_minus0[idx],
+            li_by_tau: polys.li_by_tau[idx],
+            li_by_z: polys.li_by_z[idx].clone() 
+        }
+
+    }
+}
+
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct IsValidHelper {
     pub li: Vec<G2>,
     pub li_minus0: Vec<G2>,
@@ -199,6 +220,26 @@ fn initialize_kzg_setup(kzg_setup: UniversalParams<E>) {
 fn get_kzg_setup() -> &'static UniversalParams<E> {
     unsafe {
         KZG_SETUP.as_ref().expect("KZG_SETUP has not been initialized")
+    }
+}
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct LagrangePoly {
+    pub li: G1,
+    pub li_minus0: G1,
+    pub li_by_tau: G1,
+    pub li_by_z: Vec<G1>,
+}
+
+impl LagrangePoly {
+    pub fn new(idx: usize, polys: &LagrangePolyHelper) -> Self {
+        Self {
+            li: polys.li[idx],
+            li_minus0: polys.li_minus0[idx],
+            li_by_tau: polys.li_by_tau[idx],
+            li_by_z: polys.li_by_z[idx].clone() 
+        }
+
     }
 }
 

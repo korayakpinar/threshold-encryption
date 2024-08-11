@@ -11,7 +11,6 @@ use block_modes::block_padding::Pkcs7;
 use crate::encryption::Ciphertext;
 use crate::kzg::UniversalParams;
 use crate::setup::{PublicKey, SecretKey};
-use crate::utils::LagrangePolyHelper;
 
 use prost::{self, Message};
 
@@ -33,27 +32,6 @@ pub struct Data {
 pub struct Poly {
     pub log2_n: usize,
     pub idx: usize
-}
-
-// LagrangePoly
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
-pub struct LagrangePoly {
-    pub li: G1,
-    pub li_minus0: G1,
-    pub li_by_tau: G1,
-    pub li_by_z: Vec<G1>,
-}
-
-impl LagrangePoly {
-    pub fn new(idx: usize, polys: &LagrangePolyHelper) -> Self {
-        Self {
-            li: polys.li[idx],
-            li_minus0: polys.li_minus0[idx],
-            li_by_tau: polys.li_by_tau[idx],
-            li_by_z: polys.li_by_z[idx].clone() 
-        }
-
-    }
 }
 
 // IsValid

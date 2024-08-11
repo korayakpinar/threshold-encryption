@@ -3,7 +3,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use clap::{arg, Parser};
 use rocket::{data::{Limits, ToByteUnit}, post, routes, Config, State};
 use rocket::http::Status;
-use silent_threshold::{api::types::{LagrangePoly, Poly}, utils::LagrangePolyHelper};
+use silent_threshold::{api::types::Poly, utils::{LagrangePoly, LagrangePolyHelper}};
 use tokio::io::AsyncReadExt;
 
 #[derive(Parser, Debug)]

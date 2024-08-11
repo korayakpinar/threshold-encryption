@@ -6,7 +6,8 @@ use ark_poly::{domain::EvaluationDomain, univariate::DensePolynomial, Radix2Eval
 use ark_serialize::*;
 use ark_std::{rand::RngCore, One, UniformRand, Zero};
 use std::ops::{Mul, Sub};
-use crate::api::types::{LagrangePoly, E as Q};
+use crate::api::types::E as Q;
+use crate::utils::LagrangePoly;
 use crate::kzg::{UniversalParams, KZG10};
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]

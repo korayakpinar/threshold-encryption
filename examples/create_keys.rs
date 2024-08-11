@@ -7,8 +7,10 @@ use clap::Parser;
 use ark_bls12_381::Bls12_381;
 use rand::{rngs::OsRng, RngCore};
 use silent_threshold::{
-    api::types::LagrangePoly, setup::{get_pk_exp, SecretKey}, utils::LagrangePolyHelper
+    setup::{get_pk_exp, SecretKey}, utils::{LagrangePoly, LagrangePolyHelper}
 };
+
+// use silent_threshold::{decryption::is_valid, kzg::UniversalParams, utils::{IsValidHelper, IsValidPoly}};
 
 type E = Bls12_381;
 
@@ -46,6 +48,20 @@ async fn main() {
     let lagrange_helper = LagrangePolyHelper::deserialize_compressed(cur).unwrap();
     drop(file);
 
+    /*let mut file = File::open("transcript-512").unwrap();
+    let mut contents = Vec::new();
+    let _ = file.read_to_end(&mut contents);
+    let cur = Cursor::new(contents);
+    let kzg_setup = UniversalParams::<E>::deserialize_compressed(cur).unwrap();
+    drop(file);
+
+    let mut file = File::open(format!("./isvalidhelpers/{}", args.n)).unwrap();
+    let mut contents = Vec::new();
+    let _ = file.read_to_end(&mut contents);
+    let cur = Cursor::new(contents);
+    let isvalid_helper = IsValidHelper::deserialize_compressed(cur).unwrap();
+    drop(file);*/
+
     if !Path::new("./keys").exists() {
         fs::create_dir("./keys").unwrap();
     }
@@ -77,10 +93,14 @@ async fn main() {
         let t = time::Instant::now();
 
         let lagrange_poly = LagrangePoly::new(i + 1, &lagrange_helper);
-
+        
         let pk = get_pk_exp(&sk, i + 1, &lagrange_poly);
         println!("{}-pk: {:#?}", pk.id, t.elapsed());
         let mut pk_wr = Vec::new();
+        
+        // let isvalid_poly = IsValidPoly::new(i + 1, &isvalid_helper);
+        // let val = is_valid(&pk, args.n, &kzg_setup, &isvalid_poly).await;
+        // println!("{}", val);
         
         let pk_filename = format!("keys/{}-pk", pk.id);
         let mut pk_file = File::create(pk_filename).expect("Can't write to the file!");

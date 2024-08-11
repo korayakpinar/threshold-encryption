@@ -10,7 +10,7 @@ use ark_std::{One, Zero};
 use std::ops::Div;
 
 use crate::{
-    api::types::{E, G1, G2}, kzg::{UniversalParams, KZG10}, setup::{AggregateKey, PublicKey}, utils::{interp_mostly_zero, IsValidHelper}
+    api::types::{E, G1, G2}, kzg::{UniversalParams, KZG10}, setup::{AggregateKey, PublicKey}, utils::{interp_mostly_zero, IsValidHelper, IsValidPoly}
 };
 
 pub async fn agg_dec<E: Pairing>(
@@ -201,33 +201,33 @@ fn prepare_and_pair(hint: G1, prepared_g2: &G2Prepared<Config>, prepared_bls_pk:
     Bls12::pairing(prepared_hint, prepared_g2.clone()) == Bls12::pairing(prepared_bls_pk.clone(), prepared_li_x)
 }
 
-pub async fn is_valid(pk: &PublicKey<E>, n: usize, kzg_params: &UniversalParams<Bls12<ark_bls12_381::Config>>, helper: &IsValidHelper) -> bool {
+pub async fn is_valid(pk: &PublicKey<E>, n: usize, kzg_params: &UniversalParams<Bls12<ark_bls12_381::Config>>, poly: &IsValidPoly) -> bool {
     let prepared_g2 = G2Prepared::from(kzg_params.powers_of_h[0]);
     let prepared_bls_pk = G1Prepared::from(pk.bls_pk);
 
     let mut tasks = Vec::new();
 
     let sk_li = pk.sk_li;
-    let li = helper.li[pk.id];
+    let li = poly.li;
     let prepared_g2_async = prepared_g2.clone();
     let prepared_bls_pk_async = prepared_bls_pk.clone();
     tasks.push(tokio::spawn(async move { prepare_and_pair(sk_li, &prepared_g2_async, &prepared_bls_pk_async, li) }));
     
     let sk_li_minus0 = pk.sk_li_minus0;
-    let li_minus0 = helper.li_minus0[pk.id];
+    let li_minus0 = poly.li_minus0;
     let prepared_g2_async = prepared_g2.clone();
     let prepared_bls_pk_async = prepared_bls_pk.clone();
     tasks.push(tokio::spawn(async move { prepare_and_pair(sk_li_minus0, &prepared_g2_async, &prepared_bls_pk_async, li_minus0 )}));
     
     let sk_li_by_tau = pk.sk_li_by_tau;
-    let li_by_tau = helper.li_by_tau[pk.id];
+    let li_by_tau = poly.li_by_tau;
     let prepared_g2_async = prepared_g2.clone();
     let prepared_bls_pk_async = prepared_bls_pk.clone();
     tasks.push(tokio::spawn(async move { prepare_and_pair(sk_li_by_tau, &prepared_g2_async, &prepared_bls_pk_async, li_by_tau) }));
 
     for i in 0..n {
         let sk_li_by_z = pk.sk_li_by_z[i];
-        let li_by_z = helper.li_by_z[i][pk.id];
+        let li_by_z = poly.li_by_z[i];
         let prepared_g2_async = prepared_g2.clone();
         let prepared_bls_pk_async = prepared_bls_pk.clone();
         

@@ -15,6 +15,7 @@ use crate::setup::{get_pk_exp, AggregateKey, SecretKey};
 use crate::decryption::agg_dec;
 
 use crate::api::types::*;
+use crate::utils::LagrangePoly;
 
 pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptRequest>) -> HttpResponse {
     unsafe { libc::malloc_trim(0); }

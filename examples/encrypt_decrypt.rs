@@ -9,7 +9,7 @@ use ark_ec::pairing::Pairing;
 use ark_std::Zero;
 use rand::rngs::OsRng;
 use silent_threshold::{
-    api::types::LagrangePoly, decryption::agg_dec, encryption::encrypt, kzg::UniversalParams, setup::{get_pk_exp, AggregateKey, PublicKey, SecretKey}, utils::LagrangePolyHelper
+    decryption::agg_dec, encryption::encrypt, kzg::UniversalParams, setup::{get_pk_exp, AggregateKey, PublicKey, SecretKey}, utils::{LagrangePoly, LagrangePolyHelper}
 };
 
 type E = Bls12_381;

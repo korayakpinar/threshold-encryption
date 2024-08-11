@@ -9,6 +9,7 @@ use ark_std::log2;
 
 use crate::api::types::*;
 use crate::setup::get_pk_exp;
+use crate::utils::LagrangePoly;
 
 
 pub async fn get_pk_route(config: HttpRequest, data: ProtoBuf<PKRequest>) -> HttpResponse {
