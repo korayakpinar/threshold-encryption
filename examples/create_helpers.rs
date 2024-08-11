@@ -87,7 +87,7 @@ async fn main() {
     println!("elapsed for normal pk: {:#?}", t.elapsed());
     
     let t = time::Instant::now();
-    let pk_exp = get_pk_exp(&sk, 0, args.n, &lagrange_helper);
+    //let pk_exp = get_pk_exp(&sk, 0, args.n, &lagrange_helper);
     println!("elapsed for experimental pk: {:#?}", t.elapsed());
 
 /*     let t = time::Instant::now();
@@ -96,7 +96,7 @@ async fn main() {
 
     println!("{}", is_valid(&pk, args.n, &kzg_setup, &is_valid_helper).await);
     println!("{}", is_valid(&pk_exp, args.n, &kzg_setup, &is_valid_helper).await); */
-    println!("{}", is_equal(&pk, &pk_exp));
+    //println!("{}", is_equal(&pk, &pk_exp));
 
     if !Path::new("./lagrangehelpers").exists() {
         fs::create_dir("./lagrangehelpers").unwrap();

@@ -7,7 +7,7 @@ use clap::Parser;
 use ark_bls12_381::Bls12_381;
 use rand::{rngs::OsRng, RngCore};
 use silent_threshold::{
-    setup::{get_pk_exp, SecretKey}, utils::LagrangePolyHelper
+    api::types::LagrangePoly, setup::{get_pk_exp, SecretKey}, utils::LagrangePolyHelper
 };
 
 type E = Bls12_381;
@@ -75,7 +75,12 @@ async fn main() {
         ecdsa_file.write_all(&ecdsa_wr).expect("Can't write to the file!");
         
         let t = time::Instant::now();
-        let pk = get_pk_exp(&sk, i + 1, args.n, &lagrange_helper);
+
+        let lagrange_poly = LagrangePoly::new(i + 1, &lagrange_helper);
+
+        println!("{}", lagrange_poly.li_by_z.len());
+
+        let pk = get_pk_exp(&sk, i + 1, &lagrange_poly);
         println!("{}-pk: {:#?}", pk.id, t.elapsed());
         let mut pk_wr = Vec::new();
         

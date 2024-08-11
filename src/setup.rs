@@ -6,9 +6,8 @@ use ark_poly::{domain::EvaluationDomain, univariate::DensePolynomial, Radix2Eval
 use ark_serialize::*;
 use ark_std::{rand::RngCore, One, UniformRand, Zero};
 use std::ops::{Mul, Sub};
-use crate::api::types::E as Q;
+use crate::api::types::{LagrangePoly, E as Q};
 use crate::kzg::{UniversalParams, KZG10};
-use crate::utils::LagrangePolyHelper;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct SecretKey<E: Pairing> {
@@ -163,8 +162,8 @@ impl<E: Pairing> SecretKey<E> {
     }
 }
 
-pub fn get_pk_exp(sk: &SecretKey<Q>, id: usize, _n: usize, lagrange_polys: &LagrangePolyHelper) -> PublicKey<Q> {
-    let mut sk_li_by_z = lagrange_polys.li_by_z[id].clone();
+pub fn get_pk_exp(sk: &SecretKey<Q>, id: usize, lagrange_poly: &LagrangePoly) -> PublicKey<Q> {
+    let mut sk_li_by_z = lagrange_poly.li_by_z.clone();
 
     for idx in 0..sk_li_by_z.len() {
         sk_li_by_z[idx] *= sk.sk;
@@ -173,10 +172,10 @@ pub fn get_pk_exp(sk: &SecretKey<Q>, id: usize, _n: usize, lagrange_polys: &Lagr
     PublicKey {
         id,
         bls_pk: <Bls12_381 as Pairing>::G1::generator() * sk.sk,
-        sk_li: lagrange_polys.li[id] * sk.sk,
-        sk_li_minus0: lagrange_polys.li_minus0[id] * sk.sk,
+        sk_li: lagrange_poly.li * sk.sk,
+        sk_li_minus0: lagrange_poly.li_minus0 * sk.sk,
         sk_li_by_z: sk_li_by_z.to_owned(),
-        sk_li_by_tau: lagrange_polys.li_by_tau[id] * sk.sk,
+        sk_li_by_tau: lagrange_poly.li_by_tau * sk.sk,
     }
 }
 

@@ -24,7 +24,36 @@ pub type Aes256Cbc = Cbc<Aes256, Pkcs7>;
 pub struct Data {
     pub kzg_setup: UniversalParams<E>,
     pub sk: SecretKey<E>,
-    pub lagrange_helpers: Vec<LagrangePolyHelper>
+    pub client: reqwest::Client,
+    pub mempool: String
+}
+
+// Poly
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct Poly {
+    pub log2_n: usize,
+    pub idx: usize
+}
+
+// LagrangePoly
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct LagrangePoly {
+    pub li: G1,
+    pub li_minus0: G1,
+    pub li_by_tau: G1,
+    pub li_by_z: Vec<G1>,
+}
+
+impl LagrangePoly {
+    pub fn new(idx: usize, polys: &LagrangePolyHelper) -> Self {
+        Self {
+            li: polys.li[idx],
+            li_minus0: polys.li_minus0[idx],
+            li_by_tau: polys.li_by_tau[idx],
+            li_by_z: polys.li_by_z[idx].clone() 
+        }
+
+    }
 }
 
 // IsValid
@@ -180,6 +209,7 @@ pub struct PartDecRequest {
 }
 
 // PK
+
 #[derive(Clone, PartialEq, Eq, Message)]
 pub struct PKRequest {
     #[prost(uint64, tag="1")]

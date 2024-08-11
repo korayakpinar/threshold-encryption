@@ -4,9 +4,9 @@ use ark_serialize::Read;
 use clap::{arg, command, Parser};
 use silent_threshold::kzg::UniversalParams;
 use silent_threshold::setup::SecretKey;
-use silent_threshold::utils::LagrangePolyHelper;
 use std::fs::File;
 use std::io::Cursor;
+// use console_subscriber;
 
 use silent_threshold::api::routes::*;
 use silent_threshold::api::types::*;
@@ -15,7 +15,7 @@ use silent_threshold::api::types::*;
 #[command(version, about, long_about = None)]
 struct Args {
     /// Path of the transcript
-    #[arg(short, long)]
+    #[arg(short, long, default_value_t = String::from("transcript-512"))]
     transcript: String,
 
     /// Path of the BLS private key
@@ -26,13 +26,15 @@ struct Args {
     #[arg(short, long, default_value_t = 8080)]
     api_port: u16,
 
-    #[arg(short, long, default_value_t = false)]
-    test: bool
+    /// Mempool api port
+    #[arg(short, long, default_value_t = 65534)]
+    mempool_port: u16,
 }
 
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // console_subscriber::init();
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
     
     let args = Args::parse();
@@ -46,7 +48,7 @@ async fn main() -> std::io::Result<()> {
 
         let cursor = Cursor::new(contents);
         kzg_setup = UniversalParams::<E>::deserialize_compressed(cursor).expect("Unable to deserialize kzg_setup");
-        println!("powers_of_g: {}, powers_of_h: {}", kzg_setup.powers_of_g.len(), kzg_setup.powers_of_h.len());
+        log::info!("powers_of_g: {}, powers_of_h: {}", kzg_setup.powers_of_g.len(), kzg_setup.powers_of_h.len());
         drop(file);
     }
 
@@ -60,35 +62,9 @@ async fn main() -> std::io::Result<()> {
         drop(file);
     }
 
-    let mut lagrange_helpers = Vec::new();
-    if !args.test {
-        let lagrange_paths = std::fs::read_dir("./lagrangehelpers").unwrap();
-        for path in lagrange_paths {
-            let p = path.unwrap().path();
-            
-            let mut file = File::open(p.to_str().unwrap()).unwrap();
-            let mut contents = Vec::new();
-            file.read_to_end(&mut contents).expect("Can't read the file!");
-            let cursor = Cursor::new(contents);
-
-            let lagrange = LagrangePolyHelper::deserialize_compressed(cursor).unwrap();
-            lagrange_helpers.push(lagrange);
-            log::info!("{}", p.to_str().unwrap());
-            drop(file);
-        }
-    } else {
-        let mut file = File::open("./lagrangehelpers/2").unwrap();
-        let mut contents = Vec::new();
-        file.read_to_end(&mut contents).expect("Can't read the file!");
-        let cursor = Cursor::new(contents);
-
-        let lagrange = LagrangePolyHelper::deserialize_compressed(cursor).unwrap();
-        lagrange_helpers.push(lagrange);
-        drop(file);
-    }
-    
-
-    let data = web::Data::new(Data { kzg_setup, sk, lagrange_helpers });
+    let client = reqwest::Client::new();
+    let mempool = format!("http://127.0.0.1:{}/poly", args.mempool_port);
+    let data = web::Data::new(Data { kzg_setup, sk, client, mempool });
 
     log::info!("starting HTTP server at http://localhost:{}", args.api_port);
     HttpServer::new(move || {

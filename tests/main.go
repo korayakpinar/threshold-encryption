@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/korayakpinar/threshold-encryption/api"
 	"google.golang.org/protobuf/proto"
@@ -208,73 +209,61 @@ func main() {
 
 	expected := "Hello, world!"
 
+	total := time.Now()
+
 	pks := make([][]byte, k)
-	j := 8080
-	for i := 0; i < int(k); i++ {
-		pk, err := GetPK(uint64(i), n, fmt.Sprintf("http://127.0.0.1:%d/getpk", j))
-		if err != nil {
-			fmt.Println("can't get pk", err)
-			os.Exit(1)
-		}
-		file, err := os.Open(fmt.Sprintf("../keys/%d-pk", i+1))
-		if err != nil {
-			fmt.Println("can't open file", err)
-			os.Exit(1)
-		}
-		z := make([]byte, 1024)
-		_, err = file.Read(z)
-		for w := 0; w < len(pk); w++ {
-			if pk[w] != z[w] {
-				fmt.Printf("pk[%d] is wrong, %d, %d\n", w, pk[w], z[w])
-				os.Exit(1)
-			}
-		}
-		if err != nil {
-			fmt.Println("can't read file", err)
-			os.Exit(1)
-		}
-		pks[i] = pk
-		j++
-	}
-
-	enc, err := EncryptTransaction([]byte(expected), pks, t, n, "http://127.0.0.1:8080/encrypt")
-
+	ti := time.Now()
+	pk, err := GetPK(0, n, "http://127.0.0.1:8080/getpk")
+	fmt.Println("getpk", time.Since(ti))
 	if err != nil {
-		fmt.Println("can't encrypt transaction")
+		fmt.Println("can't get pk", err)
+		os.Exit(1)
+	}
+	pks[0] = pk
+
+	ti = time.Now()
+	enc, err := EncryptTransaction([]byte(expected), pks, t, n, "http://127.0.0.1:8080/encrypt")
+	fmt.Println("encrypt", time.Since(ti))
+	if err != nil {
+		fmt.Println("can't encrypt transaction", err)
 		os.Exit(1)
 	}
 
-	parts := make([][]byte, n)
-	j = 8080
+	parts := make([][]byte, k)
 
-	for i := 0; i < int(k); i++ {
-		part, err := PartialDecrypt(enc.GammaG2, fmt.Sprintf("http://127.0.0.1:%d/partdec", j))
-		if err != nil {
-			fmt.Println("can't get part")
-			os.Exit(1)
-		}
-		err = VerifyPart(pks[i], enc.GammaG2, part, "http://127.0.0.1:8080/verifydec")
-		if err != nil {
-			fmt.Println("can't verify part")
-			os.Exit(1)
-		}
-		parts[i] = part
-		j++
+	ti = time.Now()
+	part, err := PartialDecrypt(enc.GammaG2, "http://127.0.0.1:8080/partdec")
+	fmt.Println("partdec", time.Since(ti))
+	if err != nil {
+		fmt.Println("can't get part", err)
+		os.Exit(1)
 	}
+
+	ti = time.Now()
+	err = VerifyPart(pks[0], enc.GammaG2, part, "http://127.0.0.1:8080/verifydec")
+	fmt.Println("verifypart", time.Since(ti))
+	if err != nil {
+		fmt.Println("can't verify part", err)
+		os.Exit(1)
+	}
+	parts[0] = part
 
 	new_parts := make(map[uint64]([]byte))
 	new_parts[0] = parts[0]
 
+	ti = time.Now()
 	dec, err := DecryptTransaction(enc.Enc, pks, new_parts, enc.GammaG2, enc.Sa1, enc.Sa2, enc.Iv, t, n)
+	fmt.Println("decrypt", time.Since(ti))
+
+	fmt.Println("total time elapsed", time.Since(total))
 
 	if err != nil {
-		fmt.Println("can't decrypt transaction")
+		fmt.Println("can't decrypt transaction", err)
 		os.Exit(1)
 	}
 
 	if string(dec) != expected {
-		fmt.Println("can't decrypt the data")
+		fmt.Println("can't decrypt the data", string(dec))
 		os.Exit(1)
 	}
-
 }

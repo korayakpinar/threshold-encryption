@@ -9,10 +9,7 @@ use ark_ec::pairing::Pairing;
 use ark_std::Zero;
 use rand::rngs::OsRng;
 use silent_threshold::{
-    decryption::agg_dec,
-    encryption::encrypt,
-    kzg::UniversalParams,
-    setup::{get_pk_exp, AggregateKey, PublicKey, SecretKey}, utils::LagrangePolyHelper,
+    api::types::LagrangePoly, decryption::agg_dec, encryption::encrypt, kzg::UniversalParams, setup::{get_pk_exp, AggregateKey, PublicKey, SecretKey}, utils::LagrangePolyHelper
 };
 
 type E = Bls12_381;
@@ -78,7 +75,10 @@ async fn main() {
 
     sk.push(SecretKey::<E>::new(&mut rng));
     sk[0].nullify();
-    pk.push(get_pk_exp(&sk[0], 0, n, &lagrange_helper));
+
+    let lagrange_poly = LagrangePoly::new(0, &lagrange_helper);
+
+    pk.push(get_pk_exp(&sk[0], 0, &lagrange_poly));
 
     for i in 1..k {
         let ti = time::Instant::now();

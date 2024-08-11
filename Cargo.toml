@@ -26,6 +26,9 @@ actix-protobuf = "0.10.0"
 hex = "0.4.3"
 clap = { version = "4.5.8", features = ["derive", "env", "wrap_help", "cargo"] }
 tokio = { version = "1.39.2", features = ["full"] }
+rocket = "0.5.1"
+reqwest = "0.12.5"
+libc = "0.2.155"
 
 [features]
 asm = [ "ark-ff/asm" ]

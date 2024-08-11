@@ -1,6 +1,10 @@
+use std::io::Cursor;
+use std::time;
+
 use actix_protobuf::{ProtoBuf, ProtoBufResponseBuilder};
 use actix_web::{HttpRequest, HttpResponse};
 
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{log2, Zero};
 
 use rand::rngs::OsRng;
@@ -13,11 +17,15 @@ use crate::decryption::agg_dec;
 use crate::api::types::*;
 
 pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptRequest>) -> HttpResponse {
+    unsafe { libc::malloc_trim(0); }
+
+    let ti = time::Instant::now();
     let datum = config.app_data::<Data>().unwrap();
-    let kzg_setup = datum.clone().kzg_setup;
+    let kzg_setup = &datum.kzg_setup;
 
     let params_res = data.0.deserialize();
     if params_res.is_none() {
+        unsafe { libc::malloc_trim(0); }
         log::error!("can't deserialize decrypt params");
         return HttpResponse::BadRequest().finish();
     }
@@ -46,12 +54,39 @@ pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptRequest>) 
 
     let mut pks = params.pks;
 
-    let l = log2(params.n) as usize - 1;
-    let lagrange_helper = &datum.lagrange_helpers[l];
+    let log2_n = log2(params.n) as usize - 1;
+    let req = Poly { log2_n, idx: 0 };
 
-    pks.insert(0, get_pk_exp(&sk_zero, 0, params.n, &lagrange_helper));
+    let mut wr = Vec::new();
+    let serialize_result = req.serialize_compressed(&mut wr);
+    if serialize_result.is_err() {
+        unsafe { libc::malloc_trim(0); }
+        log::error!("can't serialize data!");
+        return HttpResponse::InternalServerError().finish();
+    }
 
-    //println!("{:#?}, {:#?}, {:#?}, {}, {}", partial_decryptions, partial_decryptions.len(), params.parts.len(), params.t, params.n);
+    let client = &datum.client;
+    let resp = client.post(&datum.mempool).body(wr).send().await;
+    if resp.is_err() {
+        unsafe { libc::malloc_trim(0); }
+        log::error!("can't reach internal api!");
+        return HttpResponse::InternalServerError().finish();
+    }
+    let bytes = resp.unwrap().bytes().await;
+    if bytes.is_err() {
+        unsafe { libc::malloc_trim(0); }
+        log::error!("can't read bytes from internal api response!");
+        return HttpResponse::InternalServerError().finish();
+    }
+    let cur = Cursor::new(bytes.unwrap());
+    let lagrange_poly = LagrangePoly::deserialize_compressed(cur);
+    if lagrange_poly.is_err() {
+        unsafe { libc::malloc_trim(0); }
+        log::error!("can't deserialize bytes from internal api response!");
+        return HttpResponse::InternalServerError().finish();
+    }
+
+    pks.insert(0, get_pk_exp(&sk_zero, 0, &lagrange_poly.unwrap()));
 
     let aggregated = AggregateKey::<E>::new(pks, params.n, &kzg_setup);
     let key = agg_dec(&partial_decryptions, &params.sa1, &params.sa2, params.t, params.n, &selector, &aggregated, &kzg_setup).await;
@@ -64,6 +99,7 @@ pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptRequest>) 
 
     let cipher_dec_res = Aes256Cbc::new_from_slices(&key, &params.iv);
     if cipher_dec_res.is_err() {
+        unsafe { libc::malloc_trim(0); }
         log::error!("key or params.decrypt.iv is wrong");
         return HttpResponse::BadRequest().finish();
     }
@@ -71,15 +107,28 @@ pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptRequest>) 
 
     let decrypted_res = cipher_dec.decrypt_vec(&params.enc);
     if decrypted_res.is_err() {
+        unsafe { libc::malloc_trim(0); }
         log::error!("failed to decrypt the data, {}", decrypted_res.err().unwrap());
         return HttpResponse::UnavailableForLegalReasons().finish();
     }
     let result = decrypted_res.unwrap();
 
+    drop(aggregated);
+    drop(sk_zero);
+    drop(selector);
+    drop(partial_decryptions);
+    drop(req);
+    drop(params.enc);
+    drop(params.iv);
+    drop(params.parts);
+
     let resp = HttpResponse::Ok().protobuf(Response { result });
     if resp.is_err() {
+        unsafe { libc::malloc_trim(0); }
         log::error!("can't cast the result to ResultProto");
         return HttpResponse::InternalServerError().finish();
     }
+    log::info!("elapsed on decrypt: {:#?}", ti.elapsed());
+    unsafe { libc::malloc_trim(0); }
     resp.unwrap()
 }
