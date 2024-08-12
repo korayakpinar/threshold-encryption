@@ -128,5 +128,27 @@ Use ```cargo run --example endtoend``` to check correctness of the implementatio
 - `400`: Unable to deserialize the proto.
 - `451`: Verification failed.
 
+---
+
+### /isvalid
+
+**Endpoint** `/isvalid`
+
+**Method:** `POST`
+
+**Request Parameters:**
+
+- `pk` (bytes): The public key.
+- `n` (uint64): Total number of participants.
+
+**Response:**
+
+- `200`: Verification succeeded.
+
+**Error Responses:**
+
+- `400`: Unable to deserialize the proto.
+- `451`: Verification failed.
+
 ## License
 This library is released under the MIT License.
