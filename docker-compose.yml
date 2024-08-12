@@ -1,0 +1,5 @@
+services:
+  mempool:
+    image: mempool
+    ports:
+      - "65534:65534"

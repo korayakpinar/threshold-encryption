@@ -10,7 +10,7 @@ use ark_std::{One, Zero};
 use std::ops::Div;
 
 use crate::{
-    api::types::{E, G1, G2}, kzg::{UniversalParams, KZG10}, setup::{AggregateKey, PublicKey}, utils::{interp_mostly_zero, IsValidHelper, IsValidPoly}
+    api::types::{E, G1, G2}, kzg::{UniversalParams, KZG10}, setup::{AggregateKey, PublicKey}, utils::{interp_mostly_zero, IsValidPoly}
 };
 
 pub async fn agg_dec<E: Pairing>(

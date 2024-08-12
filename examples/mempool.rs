@@ -1,4 +1,4 @@
-use std::{fs::File, io::{Cursor, Read}};
+use std::{fs::File, io::{Cursor, Read}, net::IpAddr};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use clap::{arg, Parser};
 use rocket::{data::{Limits, ToByteUnit}, post, routes, Config, State};
@@ -153,6 +153,7 @@ async fn main() -> Result<(), std::io::Error> {
     let polys_state = Polys { lagrange_polys, isvalid_polys };
 
     let config = Config {
+        address: IpAddr::from([0, 0, 0, 0]),
         port: args.port,
         limits: Limits::new().limit("data-form", 1.kilobytes()),
         ..Default::default()
