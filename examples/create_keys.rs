@@ -83,12 +83,10 @@ async fn main() {
         // Generate ECDSA key bytes and serialize
         let mut secret_key_bytes = [0u8; 32];
         rng.fill_bytes(&mut secret_key_bytes);
-        let mut ecdsa_wr = Vec::new();
-        secret_key_bytes.serialize_compressed(&mut ecdsa_wr).unwrap();
 
         // Write the ECDSA key to file
         let mut ecdsa_file = File::create(ecdsa_filename).expect("Can't open the file!");
-        ecdsa_file.write_all(&ecdsa_wr).expect("Can't write to the file!");
+        ecdsa_file.write(hex::encode(&secret_key_bytes).as_bytes()).expect("Can't write to the file!");
         
         let t = time::Instant::now();
 
