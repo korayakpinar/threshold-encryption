@@ -1,4 +1,4 @@
-FROM rust:latest
+FROM rust:slim
 
 RUN useradd -ms /bin/sh user
 
