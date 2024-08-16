@@ -1,5 +1,12 @@
+networks:
+  my-custom-network:
+    name: bridge_proxy
+    driver: bridge
+
 services:
   mempool:
     image: mempool
+    networks:
+      - my-custom-network
     ports:
       - "65534:65534"

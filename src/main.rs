@@ -30,9 +30,9 @@ struct Args {
     #[arg(short, long, default_value_t = 65534)]
     mempool_port: u16,
 
-    /// test
-    #[arg(short, long, default_value_t = false)]
-    test: bool,
+    /// Mempool url
+    #[arg(short, long, default_value_t = String::from("127.0.0.1"))]
+    mempool_url: String,
 }
 
 
@@ -67,11 +67,7 @@ async fn main() -> std::io::Result<()> {
     }
 
     let client = reqwest::Client::new();
-    let mempool = if args.test {
-        format!("http://127.0.0.1:{}/poly", args.mempool_port)
-    } else {
-        format!("http://host.docker.internal:{}/poly", args.mempool_port)
-    };
+    let mempool = format!("http://{}:{}/poly", args.mempool_url, args.mempool_port);
     let data = web::Data::new(Data { kzg_setup, sk, client, mempool });
 
     log::info!("starting HTTP server at http://localhost:{}", args.api_port);
