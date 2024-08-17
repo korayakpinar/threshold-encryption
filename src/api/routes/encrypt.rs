@@ -107,7 +107,7 @@ pub async fn encrypt_route(config: HttpRequest, data: ProtoBuf<EncryptRequest>) 
         log::error!("can't cast the result to ResultProto");
         return HttpResponse::InternalServerError().finish();
     }
-    log::info!("elapsed on decrypt: {:#?}", ti.elapsed());
+    log::info!("elapsed on encrypt: {:#?}", ti.elapsed());
     unsafe { libc::malloc_trim(0); }
     resp.unwrap()
 }
