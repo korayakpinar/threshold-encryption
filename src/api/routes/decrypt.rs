@@ -89,7 +89,7 @@ pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptRequest>) 
 
     pks.insert(0, get_pk_exp(&sk_zero, 0, &lagrange_poly.unwrap()));
 
-    let aggregated = AggregateKey::<E>::new(pks, params.n, &kzg_setup);
+    let aggregated = AggregateKey::<E>::new(pks.clone(), pks.len(), &kzg_setup);
     let key = agg_dec(&partial_decryptions, &params.sa1, &params.sa2, params.t, params.n, &selector, &aggregated, &kzg_setup).await;
 
     let mut hasher = Sha256::new();

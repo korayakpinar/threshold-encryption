@@ -10,6 +10,7 @@ impl EncryptRequest {
         // println!("len: {}", proto.pks.len());
         for (idx, pk) in self.pks.iter().enumerate() {
             if pk.is_empty() {
+                log::error!("pk is empty /encrypt {}", idx);
                 continue;
             }
             let cur = Cursor::new(pk);

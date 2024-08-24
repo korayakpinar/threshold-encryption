@@ -26,6 +26,7 @@ impl DecryptRequest {
         let mut pks = Vec::new();
         for (idx, pk) in self.pks.iter().enumerate() {
             if pk.is_empty() {
+                log::error!("pk is empty /decrypt: {}", idx);
                 continue;
             }
             let cur = Cursor::new(pk);

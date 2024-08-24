@@ -72,7 +72,7 @@ pub async fn encrypt_route(config: HttpRequest, data: ProtoBuf<EncryptRequest>) 
 
     pks.insert(0, get_pk_exp(&sk_zero, 0, &lagrange_poly.unwrap()));
 
-    let aggregated = AggregateKey::<E>::new(pks, encrypt_data.n, &kzg_setup);
+    let aggregated = AggregateKey::<E>::new(pks.clone(), pks.len(), &kzg_setup);
     let ct = encrypt(&aggregated, encrypt_data.t, &kzg_setup);
 
     let mut hasher = Sha256::new();
