@@ -4,11 +4,8 @@ use ark_serialize::CanonicalSerialize;
 
 use crate::api::types::*;
 
-pub async fn decrypt_part_route(config: HttpRequest, data: ProtoBuf<PartDecRequest>) -> HttpResponse {
+pub async fn decrypt_part_route(_: HttpRequest, data: ProtoBuf<PartDecRequest>) -> HttpResponse {
     unsafe { libc::malloc_trim(0); }
-
-    let datum = config.app_data::<Data>().unwrap();
-    let sk = datum.sk.clone();
 
     let decrypt_part_res = data.0.deserialize();
     if decrypt_part_res.is_none() {
@@ -16,8 +13,11 @@ pub async fn decrypt_part_route(config: HttpRequest, data: ProtoBuf<PartDecReque
         log::error!("can't deserialize gamma_g2");
         return HttpResponse::BadRequest().finish();
     }
-    let gamma_g2: G2 = decrypt_part_res.unwrap().gamma_g2;
-    
+    let decrypt_part = decrypt_part_res.unwrap();
+
+    let sk = decrypt_part.sk;
+    let gamma_g2 = decrypt_part.gamma_g2;
+
     let val = gamma_g2 * sk.sk;
     
     let mut result = Vec::new();
@@ -27,6 +27,8 @@ pub async fn decrypt_part_route(config: HttpRequest, data: ProtoBuf<PartDecReque
         log::error!("can't serialize gamma_g2 * sk");
         return HttpResponse::BadRequest().finish();
     }
+
+    drop(sk);
 
     let resp = HttpResponse::Ok().protobuf(Response { result });
     if resp.is_err() {

@@ -22,7 +22,6 @@ pub type Aes256Cbc = Cbc<Aes256, Pkcs7>;
 #[derive(Clone)]
 pub struct Data {
     pub kzg_setup: UniversalParams<E>,
-    pub sk: SecretKey<E>,
     pub client: reqwest::Client,
     pub mempool: String
 }
@@ -177,12 +176,15 @@ pub struct DecryptRequest {
 
 #[derive(Clone)]
 pub struct PartDec {
+    pub sk: SecretKey<E>,
     pub gamma_g2: G2
 }
 
 #[derive(Clone, PartialEq, Eq, Message)]
 pub struct PartDecRequest {
     #[prost(bytes, tag="1")]
+    pub sk: Vec<u8>,
+    #[prost(bytes, tag="2")]
     pub gamma_g2: Vec<u8>
 }
 
@@ -190,14 +192,17 @@ pub struct PartDecRequest {
 
 #[derive(Clone, PartialEq, Eq, Message)]
 pub struct PKRequest {
-    #[prost(uint64, tag="1")]
-    pub id: u64,
+    #[prost(bytes, tag="1")]
+    pub sk: Vec<u8>,
     #[prost(uint64, tag="2")]
+    pub id: u64,
+    #[prost(uint64, tag="3")]
     pub n: u64
 }
 
 #[derive(Clone)]
 pub struct PK {
+    pub sk: SecretKey<E>,
     pub id: usize,
     pub n: usize
 }

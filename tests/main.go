@@ -98,11 +98,12 @@ func DecryptTransaction(enc []byte, pks [][]byte, parts map[uint64]([]byte), gam
 	return decryptDataResp.Result, nil
 }
 
-func PartialDecrypt(gammaG2 []byte, url string) ([]byte, error) {
+func PartialDecrypt(sk []byte, gammaG2 []byte, url string) ([]byte, error) {
 	client := http.Client{}
 
 	req := &api.PartDecRequest{
-		GammaG2: []byte(gammaG2),
+		GammaG2: gammaG2,
+		Sk:      sk,
 	}
 	data, err := proto.Marshal(req)
 	if err != nil {
@@ -139,10 +140,11 @@ func PartialDecrypt(gammaG2 []byte, url string) ([]byte, error) {
 	return partDecResp.Result, nil
 }
 
-func GetPK(id uint64, n uint64, url string) ([]byte, error) {
+func GetPK(sk []byte, id uint64, n uint64, url string) ([]byte, error) {
 	client := http.Client{}
 
 	req := &api.PKRequest{
+		Sk: sk,
 		Id: id,
 		N:  n,
 	}
@@ -213,7 +215,19 @@ func main() {
 
 	pks := make([][]byte, k)
 	ti := time.Now()
-	pk, err := GetPK(0, n, "http://127.0.0.1:8080/getpk")
+
+	skReader, err := os.Open("../keys/1-bls")
+	if err != nil {
+		fmt.Println("can't read sk", err)
+		os.Exit(1)
+	}
+	sk, err := io.ReadAll(skReader)
+	if err != nil {
+		fmt.Println("can't read sk into an array")
+		os.Exit(1)
+	}
+
+	pk, err := GetPK(sk, 0, n, "http://127.0.0.1:8080/getpk")
 	fmt.Println("getpk", time.Since(ti))
 	if err != nil {
 		fmt.Println("can't get pk", err)
@@ -232,7 +246,7 @@ func main() {
 	parts := make([][]byte, k)
 
 	ti = time.Now()
-	part, err := PartialDecrypt(enc.GammaG2, "http://127.0.0.1:8080/partdec")
+	part, err := PartialDecrypt(sk, enc.GammaG2, "http://127.0.0.1:8080/partdec")
 	fmt.Println("partdec", time.Since(ti))
 	if err != nil {
 		fmt.Println("can't get part", err)

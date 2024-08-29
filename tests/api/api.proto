@@ -40,12 +40,14 @@ message EncryptResponse {
 }
 
 message PartDecRequest {
-    bytes gamma_g2 = 1;
+    bytes sk = 1;
+    bytes gamma_g2 = 2;
 }
 
 message PKRequest {
-    uint64 id = 1;
-    uint64 n = 2;
+    bytes sk = 1;
+    uint64 id = 2;
+    uint64 n = 3;
 }
 
 message Response {

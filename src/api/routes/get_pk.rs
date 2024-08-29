@@ -17,7 +17,6 @@ pub async fn get_pk_route(config: HttpRequest, data: ProtoBuf<PKRequest>) -> Htt
 
     let ti = time::Instant::now();
     let datum = config.app_data::<Data>().unwrap();
-    let sk = &datum.sk;
 
     let pk_res = data.0.deserialize();
     if pk_res.is_none() {
@@ -26,6 +25,7 @@ pub async fn get_pk_route(config: HttpRequest, data: ProtoBuf<PKRequest>) -> Htt
         return HttpResponse::InternalServerError().finish();
     }
     let pk = pk_res.unwrap();
+    let sk = pk.sk;
 
     let log2_n = log2(pk.n) as usize - 1;
     let req = Poly { log2_n, idx: pk.id + 1 };
@@ -59,7 +59,7 @@ pub async fn get_pk_route(config: HttpRequest, data: ProtoBuf<PKRequest>) -> Htt
         return HttpResponse::InternalServerError().finish();
     }
     
-    let pk = get_pk_exp(sk, pk.id + 1, &lagrange_poly.unwrap());
+    let pk = get_pk_exp(&sk, pk.id + 1, &lagrange_poly.unwrap());
 
     let mut result = Vec::new();
     let res = pk.serialize_compressed(&mut result);
@@ -70,6 +70,7 @@ pub async fn get_pk_route(config: HttpRequest, data: ProtoBuf<PKRequest>) -> Htt
     }
 
     drop(pk);
+    drop(sk);
     drop(req);
 
     let resp = HttpResponse::Ok().protobuf(Response { result });

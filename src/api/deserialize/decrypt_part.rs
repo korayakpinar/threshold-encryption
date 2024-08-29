@@ -13,8 +13,18 @@ impl PartDecRequest {
             return None;
         }
         let gamma_g2 = tmp.unwrap();
+        
+        let cur = Cursor::new(self.sk);
+        let tmp = CanonicalDeserialize::deserialize_compressed(cur);
+        if tmp.is_err() {
+            log::error!("can't read sk");
+            return None;
+        }
+        let sk = tmp.unwrap();
+
         Option::from(
             PartDec {
+                sk,
                 gamma_g2
             }
         )

@@ -3,10 +3,8 @@ use ark_serialize::CanonicalDeserialize;
 use ark_serialize::Read;
 use clap::{arg, command, Parser};
 use silent_threshold::kzg::UniversalParams;
-use silent_threshold::setup::SecretKey;
 use std::fs::File;
 use std::io::Cursor;
-// use console_subscriber;
 
 use silent_threshold::api::routes::*;
 use silent_threshold::api::types::*;
@@ -17,10 +15,6 @@ struct Args {
     /// Path of the transcript
     #[arg(short, long, default_value_t = String::from("transcript-512"))]
     transcript: String,
-
-    /// Path of the BLS private key
-    #[arg(short, long)]
-    bls_key: String,
 
     /// Port to start the api
     #[arg(short, long, default_value_t = 8080)]
@@ -56,19 +50,9 @@ async fn main() -> std::io::Result<()> {
         drop(file);
     }
 
-    let sk: SecretKey<E>;
-    {
-        let mut file = File::open(args.bls_key).expect("Can't open the file!");
-        let mut contents = Vec::new();
-        file.read_to_end(&mut contents).expect("Can't read the file!");
-        let cursor = Cursor::new(contents);
-        sk = SecretKey::<E>::deserialize_compressed(cursor).expect("Unable to deserialize the data!");
-        drop(file);
-    }
-
     let client = reqwest::Client::new();
     let mempool = format!("http://{}:{}/poly", args.mempool_url, args.mempool_port);
-    let data = web::Data::new(Data { kzg_setup, sk, client, mempool });
+    let data = web::Data::new(Data { kzg_setup, client, mempool });
 
     log::info!("starting HTTP server at http://localhost:{}", args.api_port);
     HttpServer::new(move || {
