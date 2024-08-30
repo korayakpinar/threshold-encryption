@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use ark_serialize::CanonicalDeserialize;
 
-use crate::api::types::{Encrypt, EncryptRequest};
+use crate::{api::types::{Encrypt, EncryptRequest, E}, setup::PublicKey};
 
 impl EncryptRequest {
     pub fn deserialize(self) -> Option<Encrypt> {
@@ -14,8 +14,9 @@ impl EncryptRequest {
                 continue;
             }
             let cur = Cursor::new(pk);
-            let tmp_pk = CanonicalDeserialize::deserialize_compressed(cur);
+            let tmp_pk = PublicKey::<E>::deserialize_uncompressed_unchecked(cur);
             if tmp_pk.is_err() {
+                log::error!("{:#?}", pk);
                 log::error!("can't deserialize pk {}", idx);
                 return None;
             }

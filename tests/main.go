@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,8 +36,8 @@ func EncryptTransaction(msg []byte, pks [][]byte, t uint64, n uint64, url string
 		return encryptDataResp, err
 	}
 
-	if resp.StatusCode == 400 {
-		return encryptDataResp, err
+	if resp.StatusCode != 200 {
+		return encryptDataResp, errors.New("can't encrypt")
 	}
 	defer resp.Body.Close()
 
@@ -80,7 +81,7 @@ func DecryptTransaction(enc []byte, pks [][]byte, parts map[uint64]([]byte), gam
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, err
+		return nil, errors.New("can't decrypt")
 	}
 	defer resp.Body.Close()
 
@@ -120,7 +121,7 @@ func PartialDecrypt(sk []byte, gammaG2 []byte, url string) ([]byte, error) {
 	}
 	if resp.StatusCode != 200 {
 		fmt.Println(err)
-		return nil, err
+		return nil, errors.New("can't encrypt")
 	}
 	defer resp.Body.Close()
 
@@ -206,36 +207,29 @@ func VerifyPart(pk []byte, gammaG2 []byte, partDec []byte, url string) error {
 
 func main() {
 	var n uint64 = 2
-	var k uint64 = 1
 	var t uint64 = 1
 
 	expected := "Hello, world!"
 
 	total := time.Now()
 
-	pks := make([][]byte, k)
+	pks := [][]byte{}
+
+	for i := uint64(1); i < n; i++ {
+		pkReader, err := os.Open(fmt.Sprintf("../keys/%d-pk", i))
+		if err != nil {
+			fmt.Println("can't read pk", err)
+			os.Exit(1)
+		}
+		pk, err := io.ReadAll(pkReader)
+		if err != nil {
+			fmt.Println("can't read pk into an array")
+			os.Exit(1)
+		}
+		pks = append(pks, pk)
+	}
+
 	ti := time.Now()
-
-	skReader, err := os.Open("../keys/1-bls")
-	if err != nil {
-		fmt.Println("can't read sk", err)
-		os.Exit(1)
-	}
-	sk, err := io.ReadAll(skReader)
-	if err != nil {
-		fmt.Println("can't read sk into an array")
-		os.Exit(1)
-	}
-
-	pk, err := GetPK(sk, 0, n, "http://127.0.0.1:8080/getpk")
-	fmt.Println("getpk", time.Since(ti))
-	if err != nil {
-		fmt.Println("can't get pk", err)
-		os.Exit(1)
-	}
-	pks[0] = pk
-
-	ti = time.Now()
 	enc, err := EncryptTransaction([]byte(expected), pks, t, n, "http://127.0.0.1:8080/encrypt")
 	fmt.Println("encrypt", time.Since(ti))
 	if err != nil {
@@ -243,14 +237,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	parts := make([][]byte, k)
+	new_parts := make(map[uint64]([]byte), t)
 
-	ti = time.Now()
-	part, err := PartialDecrypt(sk, enc.GammaG2, "http://127.0.0.1:8080/partdec")
-	fmt.Println("partdec", time.Since(ti))
-	if err != nil {
-		fmt.Println("can't get part", err)
-		os.Exit(1)
+	for i := uint64(0); i < t; i++ {
+		skReader, err := os.Open(fmt.Sprintf("../keys/%d-bls", i+1))
+		if err != nil {
+			fmt.Println("can't read sk", err)
+			os.Exit(1)
+		}
+		sk, err := io.ReadAll(skReader)
+		if err != nil {
+			fmt.Println("can't read sk into an array")
+			os.Exit(1)
+		}
+		ti = time.Now()
+		part, err := PartialDecrypt(sk, enc.GammaG2, "http://127.0.0.1:8080/partdec")
+		fmt.Println("partdec", time.Since(ti))
+		if err != nil {
+			fmt.Println("can't get part", err)
+			os.Exit(1)
+		}
+		new_parts[i] = part
 	}
 
 	/*ti = time.Now()
@@ -260,10 +267,6 @@ func main() {
 		fmt.Println("can't verify part", err)
 		os.Exit(1)
 	}*/
-	parts[0] = part
-
-	new_parts := make(map[uint64]([]byte))
-	new_parts[0] = parts[0]
 
 	ti = time.Now()
 	dec, err := DecryptTransaction(enc.Enc, pks, new_parts, enc.GammaG2, enc.Sa1, enc.Sa2, enc.Iv, t, n)
@@ -280,4 +283,5 @@ func main() {
 		fmt.Println("can't decrypt the data", string(dec))
 		os.Exit(1)
 	}
+
 }

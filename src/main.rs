@@ -58,7 +58,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())
-            .app_data(web::JsonConfig::default().limit(240000)) // <- limit size of the payload (global configuration)
+            .app_data(web::PayloadConfig::new(1024 * 1024 * 100))
             .app_data(Data::clone(&data))
             .service(web::resource("/encrypt").route(web::post().to(encrypt_route)))
             .service(web::resource("/partdec").route(web::post().to(decrypt_part_route)))

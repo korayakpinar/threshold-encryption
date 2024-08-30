@@ -102,7 +102,7 @@ async fn main() {
         
         let pk_filename = format!("keys/{}-pk", pk.id);
         let mut pk_file = File::create(pk_filename).expect("Can't write to the file!");
-        pk.serialize_compressed(&mut pk_wr).unwrap();
+        pk.serialize_uncompressed(&mut pk_wr).unwrap();
         pk_file.write_all(&pk_wr).expect("Can't write to the file!");
     }
     

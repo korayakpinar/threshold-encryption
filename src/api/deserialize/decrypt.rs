@@ -1,8 +1,9 @@
 use std::{collections::HashMap, io::Cursor};
 
+use ark_bls12_381::G2Projective;
 use ark_serialize::CanonicalDeserialize;
 
-use crate::api::types::{Decrypt, DecryptRequest, G1, G2};
+use crate::{api::types::{Decrypt, DecryptRequest, E, G1, G2}, setup::PublicKey};
 
 impl DecryptRequest {
     pub fn deserialize(self) -> Option<Decrypt> { 
@@ -30,7 +31,7 @@ impl DecryptRequest {
                 continue;
             }
             let cur = Cursor::new(pk);
-            let tmp_pk = CanonicalDeserialize::deserialize_compressed(cur);
+            let tmp_pk = PublicKey::<E>::deserialize_uncompressed_unchecked(cur);
             if tmp_pk.is_err() {
                 log::error!("can't deserialize pk {}", idx);
                 return None;
@@ -41,7 +42,7 @@ impl DecryptRequest {
         let mut parts = HashMap::new();
         for part in self.parts {
             let cur = Cursor::new(part.1);
-            let tmp_part = CanonicalDeserialize::deserialize_compressed(cur);
+            let tmp_part = G2Projective::deserialize_compressed(cur);
             if tmp_part.is_err() {
                 log::error!("can't deserialize part {}", part.0);
                 return None;
@@ -50,7 +51,7 @@ impl DecryptRequest {
         }
 
         let cur = Cursor::new(self.gamma_g2);
-        let tmp_gamma_g2 = CanonicalDeserialize::deserialize_compressed(cur);
+        let tmp_gamma_g2 = G2Projective::deserialize_compressed(cur);
         if tmp_gamma_g2.is_err() {
             log::error!("can't deserialize gamma_g2");
             return None;

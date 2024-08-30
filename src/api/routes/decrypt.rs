@@ -1,12 +1,13 @@
 use std::io::Cursor;
 use std::time;
 
-use actix_protobuf::{ProtoBuf, ProtoBufResponseBuilder};
-use actix_web::{HttpRequest, HttpResponse};
+use actix_protobuf::ProtoBufResponseBuilder;
+use actix_web::{web, HttpRequest, HttpResponse};
 
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{log2, Zero};
 
+use prost::Message;
 use rand::rngs::OsRng;
 use sha2::{Sha256, Digest};
 use block_modes::BlockMode;
@@ -17,14 +18,20 @@ use crate::decryption::agg_dec;
 use crate::api::types::*;
 use crate::utils::LagrangePoly;
 
-pub async fn decrypt_route(config: HttpRequest, data: ProtoBuf<DecryptRequest>) -> HttpResponse {
+pub async fn decrypt_route(config: HttpRequest, data: web::Payload) -> HttpResponse {
     unsafe { libc::malloc_trim(0); }
 
     let ti = time::Instant::now();
+    let bytes = data.to_bytes().await.unwrap();
+    log::info!("got the bytes from the data in {:#?}", ti.elapsed());
+
+    let data = DecryptRequest::decode(bytes).unwrap();
+    log::info!("decoded bytes to data in {:#?}", ti.elapsed());
+
     let datum = config.app_data::<Data>().unwrap();
     let kzg_setup = &datum.kzg_setup;
 
-    let params_res = data.0.deserialize();
+    let params_res = data.deserialize();
     if params_res.is_none() {
         unsafe { libc::malloc_trim(0); }
         log::error!("can't deserialize decrypt params");
