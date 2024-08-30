@@ -22,16 +22,26 @@ pub async fn encrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
     unsafe { libc::malloc_trim(0); }
 
     let ti = time::Instant::now();
-    let bytes = data.to_bytes().await.unwrap();
-    log::info!("got the bytes from the data in {:#?}", ti.elapsed());
+    let bytes_tmp = data.to_bytes().await;
+    if bytes_tmp.is_err() {
+        unsafe { libc::malloc_trim(0); }
+        log::error!("can't read bytes");
+        return HttpResponse::BadRequest().finish();
+    }
+    let bytes = bytes_tmp.unwrap();
 
-    let data = EncryptRequest::decode(bytes).unwrap();
-    log::info!("decoded bytes to data in {:#?}", ti.elapsed());
+
+    let data_tmp = EncryptRequest::decode(bytes);
+    if data_tmp.is_err() {
+        unsafe { libc::malloc_trim(0); }
+        log::error!("can't decode bytes to encrypt request");
+        return HttpResponse::BadRequest().finish();
+    }
+    let data = data_tmp.unwrap();
 
     let datum = config.app_data::<Data>().unwrap();
     let kzg_setup = &datum.kzg_setup;
 
-    log::info!("deserializing data at {:#?}", ti.elapsed());
     let encrypt_data_res = data.deserialize();
     if encrypt_data_res.is_none() {
         unsafe { libc::malloc_trim(0); }
@@ -39,7 +49,6 @@ pub async fn encrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
         return HttpResponse::BadRequest().finish();
     }
     let encrypt_data = encrypt_data_res.unwrap();
-    log::info!("deserialized data at {:#?}", ti.elapsed());
 
     let mut pks = encrypt_data.pks;
 
@@ -47,22 +56,17 @@ pub async fn encrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
     let req = Poly { log2_n, idx: 0 };
     
     let mut wr = Vec::new();
-    log::info!("serializing data at {:#?}", ti.elapsed());
     let serialize_result = req.serialize_compressed(&mut wr);
     if serialize_result.is_err() {
         unsafe { libc::malloc_trim(0); }
         log::error!("can't serialize data!");
         return HttpResponse::InternalServerError().finish();
     }
-    log::info!("serialized data at {:#?}", ti.elapsed());
     
-    log::info!("creating secret key zero at {:#?}", ti.elapsed());
     let mut rng = OsRng;
     let mut sk_zero: SecretKey<E> = SecretKey::new(&mut rng);
     sk_zero.nullify();
-    log::info!("created secret key zero at {:#?}", ti.elapsed());
 
-    log::info!("gonna send the request in {:#?}", ti.elapsed());
     let client = &datum.client;
     let resp = client.post(&datum.mempool).body(wr).send().await;
     if resp.is_err() {
@@ -70,27 +74,21 @@ pub async fn encrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
         log::error!("can't reach internal api!");
         return HttpResponse::InternalServerError().finish();
     }
-    log::info!("got the response in {:#?}", ti.elapsed());
     let bytes = resp.unwrap().bytes().await;
     if bytes.is_err() {
         unsafe { libc::malloc_trim(0); }
         log::error!("can't read bytes from internal api response!");
         return HttpResponse::InternalServerError().finish();
     }
-    log::info!("awaited response in {:#?}", ti.elapsed());
     let cur = Cursor::new(bytes.unwrap());
-    log::info!("deserializing lagrange poly at {:#?}", ti.elapsed());
     let lagrange_poly = LagrangePoly::deserialize_compressed(cur);
     if lagrange_poly.is_err() {
         unsafe { libc::malloc_trim(0); }
         log::error!("can't deserialize bytes from internal api response!");
         return HttpResponse::InternalServerError().finish();
     }
-    log::info!("deserialized lagrange poly at {:#?}", ti.elapsed());
 
-    log::info!("getting the public key at {:#?}", ti.elapsed());
     pks.insert(0, get_pk_exp(&sk_zero, 0, &lagrange_poly.unwrap()));
-    log::info!("got the public key at {:#?}", ti.elapsed());
 
     let aggregated = AggregateKey::<E>::new(pks.clone(), pks.len(), &kzg_setup);
     let ct = encrypt(&aggregated, encrypt_data.t, &kzg_setup);

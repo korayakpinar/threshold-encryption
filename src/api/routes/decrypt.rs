@@ -22,11 +22,22 @@ pub async fn decrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
     unsafe { libc::malloc_trim(0); }
 
     let ti = time::Instant::now();
-    let bytes = data.to_bytes().await.unwrap();
-    log::info!("got the bytes from the data in {:#?}", ti.elapsed());
+    let bytes_tmp = data.to_bytes().await;
+    if bytes_tmp.is_err() {
+        unsafe { libc::malloc_trim(0); }
+        log::error!("can't read bytes");
+        return HttpResponse::BadRequest().finish();
+    }
+    let bytes = bytes_tmp.unwrap();
 
-    let data = DecryptRequest::decode(bytes).unwrap();
-    log::info!("decoded bytes to data in {:#?}", ti.elapsed());
+
+    let data_tmp = DecryptRequest::decode(bytes);
+    if data_tmp.is_err() {
+        unsafe { libc::malloc_trim(0); }
+        log::error!("can't decode bytes to decrypt request");
+        return HttpResponse::BadRequest().finish();
+    }
+    let data = data_tmp.unwrap();
 
     let datum = config.app_data::<Data>().unwrap();
     let kzg_setup = &datum.kzg_setup;
