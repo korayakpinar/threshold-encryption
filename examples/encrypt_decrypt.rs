@@ -86,7 +86,7 @@ async fn main() {
         let mut contents = Vec::new();
         let _ = file.read_to_end(&mut contents);
         let cur = Cursor::new(contents);
-        let key = PublicKey::<E>::deserialize_compressed(cur).unwrap();
+        let key = PublicKey::<E>::deserialize_uncompressed_unchecked(cur).unwrap();
         pk.push(key);
         
         let mut file = File::open(format!("keys/{}-bls", i)).unwrap();
