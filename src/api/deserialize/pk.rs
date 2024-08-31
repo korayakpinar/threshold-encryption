@@ -1,12 +1,12 @@
 use ark_serialize::CanonicalDeserialize;
 use std::io::Cursor;
 
-use crate::api::types::{PKRequest, PK};
+use crate::{api::types::{PKRequest, E, PK}, setup::SecretKey};
 
 impl PKRequest {
     pub fn deserialize(self) -> Option<PK> {
         let cur = Cursor::new(self.sk);
-        let tmp = CanonicalDeserialize::deserialize_compressed(cur);
+        let tmp = SecretKey::<E>::deserialize_compressed(cur);
         if tmp.is_err() {
             log::error!("can't read sk");
             return None;

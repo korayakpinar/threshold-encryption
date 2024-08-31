@@ -42,7 +42,7 @@ impl DecryptRequest {
         let mut parts = HashMap::new();
         for part in self.parts {
             let cur = Cursor::new(part.1);
-            let tmp_part = G2Projective::deserialize_compressed(cur);
+            let tmp_part = G2Projective::deserialize_uncompressed_unchecked(cur);
             if tmp_part.is_err() {
                 log::error!("can't deserialize part {}", part.0);
                 return None;

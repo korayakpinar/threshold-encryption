@@ -115,13 +115,13 @@ impl EncryptResponse {
         let mut sa2 = Vec::new();
         res = ct.sa2.serialize_compressed(&mut sa2);
         if res.is_err() {
-            log::error!("can't serialize sa1");
+            log::error!("can't serialize sa2");
         }
 
         let mut gamma_g2 = Vec::new();
         res = ct.gamma_g2.serialize_compressed(&mut gamma_g2);
         if res.is_err() {
-            log::error!("can't serialize sa1");
+            log::error!("can't serialize gamma_2");
         }
 
         EncryptResponse {

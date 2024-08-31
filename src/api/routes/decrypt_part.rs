@@ -21,7 +21,7 @@ pub async fn decrypt_part_route(_: HttpRequest, data: ProtoBuf<PartDecRequest>) 
     let val = gamma_g2 * sk.sk;
     
     let mut result = Vec::new();
-    let res = val.serialize_compressed(&mut result);
+    let res = val.serialize_uncompressed(&mut result);
     if res.is_err() {
         unsafe { libc::malloc_trim(0); }
         log::error!("can't serialize gamma_g2 * sk");

@@ -1,13 +1,14 @@
 use std::io::Cursor;
 
+use ark_bls12_381::G2Projective;
 use ark_serialize::CanonicalDeserialize;
 
-use crate::api::types::{PartDec, PartDecRequest};
+use crate::{api::types::{PartDec, PartDecRequest, E}, setup::SecretKey};
 
 impl PartDecRequest {
     pub fn deserialize(self) -> Option<PartDec> {
         let cur = Cursor::new(self.gamma_g2);
-        let tmp = CanonicalDeserialize::deserialize_compressed(cur);
+        let tmp = G2Projective::deserialize_compressed(cur);
         if tmp.is_err() {
             log::error!("can't read gamma_g2");
             return None;
@@ -15,7 +16,7 @@ impl PartDecRequest {
         let gamma_g2 = tmp.unwrap();
         
         let cur = Cursor::new(self.sk);
-        let tmp = CanonicalDeserialize::deserialize_compressed(cur);
+        let tmp = SecretKey::<E>::deserialize_compressed(cur);
         if tmp.is_err() {
             log::error!("can't read sk");
             return None;
