@@ -13,13 +13,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func EncryptTransaction(msg []byte, pks [][]byte, t uint64, n uint64, url string) (api.EncryptResponse, error) {
+func EncryptTransaction(msg []byte, t uint64, n uint64, url string) (api.EncryptResponse, error) {
 	client := http.Client{}
 	var encryptDataResp api.EncryptResponse
 
 	req := &api.EncryptRequest{
 		Msg: msg,
-		Pks: pks,
 		T:   t,
 		N:   n,
 	}
@@ -54,12 +53,11 @@ func EncryptTransaction(msg []byte, pks [][]byte, t uint64, n uint64, url string
 	return encryptDataResp, nil
 }
 
-func DecryptTransaction(enc []byte, pks [][]byte, parts map[uint64]([]byte), gamma_g2 []byte, sa1 []byte, sa2 []byte, iv []byte, t uint64, n uint64) ([]byte, error) {
+func DecryptTransaction(enc []byte, parts map[uint64]([]byte), gamma_g2 []byte, sa1 []byte, sa2 []byte, iv []byte, t uint64, n uint64) ([]byte, error) {
 	client := http.Client{}
 
 	req := &api.DecryptRequest{
 		Enc:     []byte(enc),
-		Pks:     pks,
 		Parts:   parts,
 		GammaG2: gamma_g2,
 		Sa1:     sa1,
@@ -213,24 +211,8 @@ func main() {
 
 	total := time.Now()
 
-	pks := [][]byte{}
-
-	for i := uint64(1); i < n; i++ {
-		pkReader, err := os.Open(fmt.Sprintf("../keys/%d-pk", i))
-		if err != nil {
-			fmt.Println("can't read pk", err)
-			os.Exit(1)
-		}
-		pk, err := io.ReadAll(pkReader)
-		if err != nil {
-			fmt.Println("can't read pk into an array")
-			os.Exit(1)
-		}
-		pks = append(pks, pk)
-	}
-
 	ti := time.Now()
-	enc, err := EncryptTransaction([]byte(expected), pks, t, n, "http://127.0.0.1:8080/encrypt")
+	enc, err := EncryptTransaction([]byte(expected), t, n, "http://127.0.0.1:8080/encrypt")
 	fmt.Println("encrypt", time.Since(ti))
 	if err != nil {
 		fmt.Println("can't encrypt transaction", err)
@@ -250,6 +232,36 @@ func main() {
 			fmt.Println("can't read sk into an array")
 			os.Exit(1)
 		}
+
+		pkReader, err := os.Open(fmt.Sprintf("../keys/%d-pk", i+1))
+		if err != nil {
+			fmt.Println("can't read pk", err)
+			os.Exit(1)
+		}
+		pk, err := io.ReadAll(pkReader)
+		if err != nil {
+			fmt.Println("can't read pk into an array")
+			os.Exit(1)
+		}
+
+		ti = time.Now()
+		pkServer, err := GetPK(sk, i, n, "http://127.0.0.1:8080/getpk")
+		fmt.Println("getpk", time.Since(ti))
+		if err != nil {
+			fmt.Println("can't get pk", err)
+			os.Exit(1)
+		}
+		if len(pkServer) != len(pk) {
+			fmt.Println("local pk is wrong")
+			os.Exit(1)
+		}
+		for j := 0; j < len(pkServer); j++ {
+			if pk[j] != pkServer[j] {
+				fmt.Printf("pk[%d] is wrong", j)
+				os.Exit(1)
+			}
+		}
+
 		ti = time.Now()
 		part, err := PartialDecrypt(sk, enc.GammaG2, "http://127.0.0.1:8080/partdec")
 		fmt.Println("partdec", time.Since(ti))
@@ -269,7 +281,7 @@ func main() {
 	}*/
 
 	ti = time.Now()
-	dec, err := DecryptTransaction(enc.Enc, pks, new_parts, enc.GammaG2, enc.Sa1, enc.Sa2, enc.Iv, t, n)
+	dec, err := DecryptTransaction(enc.Enc, new_parts, enc.GammaG2, enc.Sa1, enc.Sa2, enc.Iv, t, n)
 	fmt.Println("decrypt", time.Since(ti))
 
 	fmt.Println("total time elapsed", time.Since(total))

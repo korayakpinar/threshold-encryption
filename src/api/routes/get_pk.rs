@@ -62,7 +62,7 @@ pub async fn get_pk_route(config: HttpRequest, data: ProtoBuf<PKRequest>) -> Htt
     let pk = get_pk_exp(&sk, pk.id + 1, &lagrange_poly.unwrap());
 
     let mut result = Vec::new();
-    let res = pk.serialize_compressed(&mut result);
+    let res = pk.serialize_uncompressed(&mut result);
     if res.is_err() {
         unsafe { libc::malloc_trim(0); }
         log::error!("can't serialize public key");

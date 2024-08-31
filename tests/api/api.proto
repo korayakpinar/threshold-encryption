@@ -14,21 +14,19 @@ message IsValidRequest {
 
 message DecryptRequest {
     bytes enc = 1;
-    repeated bytes pks = 2;
-    map<uint64, bytes> parts = 3;
-    bytes gamma_g2 = 4; 
-    bytes sa1 = 5;
-    bytes sa2 = 6;
-    bytes iv = 7;
-    uint64 t = 8;
-    uint64 n = 9;
+    map<uint64, bytes> parts = 2;
+    bytes gamma_g2 = 3;
+    bytes sa1 = 4;
+    bytes sa2 = 5;
+    bytes iv = 6;
+    uint64 t = 7;
+    uint64 n = 8;
 }
 
 message EncryptRequest {
     bytes msg = 1;
-    repeated bytes pks = 2;
-    uint64 t = 3;
-    uint64 n = 4;
+    uint64 t = 2;
+    uint64 n = 3;
 }
 
 message EncryptResponse {

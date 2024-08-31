@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use std::io::Cursor;
 use std::time;
 
@@ -71,44 +72,7 @@ pub async fn decrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
         }
     }
 
-    let mut pks = params.pks;
-
-    let log2_n = log2(params.n) as usize - 1;
-    let req = Poly { log2_n, idx: 0 };
-
-    let mut wr = Vec::new();
-    let serialize_result = req.serialize_compressed(&mut wr);
-    if serialize_result.is_err() {
-        unsafe { libc::malloc_trim(0); }
-        log::error!("can't serialize data!");
-        return HttpResponse::InternalServerError().finish();
-    }
-
-    let client = &datum.client;
-    let resp = client.post(&datum.mempool).body(wr).send().await;
-    if resp.is_err() {
-        unsafe { libc::malloc_trim(0); }
-        log::error!("can't reach internal api!");
-        return HttpResponse::InternalServerError().finish();
-    }
-    let bytes = resp.unwrap().bytes().await;
-    if bytes.is_err() {
-        unsafe { libc::malloc_trim(0); }
-        log::error!("can't read bytes from internal api response!");
-        return HttpResponse::InternalServerError().finish();
-    }
-    let cur = Cursor::new(bytes.unwrap());
-    let lagrange_poly = LagrangePoly::deserialize_compressed(cur);
-    if lagrange_poly.is_err() {
-        unsafe { libc::malloc_trim(0); }
-        log::error!("can't deserialize bytes from internal api response!");
-        return HttpResponse::InternalServerError().finish();
-    }
-
-    pks.insert(0, get_pk_exp(&sk_zero, 0, &lagrange_poly.unwrap()));
-
-    let aggregated = AggregateKey::<E>::new(pks.clone(), pks.len(), &kzg_setup);
-    let key = agg_dec(&partial_decryptions, &params.sa1, &params.sa2, params.t, params.n, &selector, &aggregated, &kzg_setup).await;
+    let key = agg_dec(&partial_decryptions, &params.sa1, &params.sa2, params.t, params.n, &selector, &datum.aggregated, &kzg_setup).await;
 
     let mut hasher = Sha256::new();
     hasher.update(key.to_string().as_bytes());
@@ -132,11 +96,9 @@ pub async fn decrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
     }
     let result = decrypted_res.unwrap();
 
-    drop(aggregated);
     drop(sk_zero);
     drop(selector);
     drop(partial_decryptions);
-    drop(req);
     drop(params.enc);
     drop(params.iv);
     drop(params.parts);

@@ -3,7 +3,8 @@ use std::{collections::HashMap, io::Cursor};
 use ark_bls12_381::G2Projective;
 use ark_serialize::CanonicalDeserialize;
 
-use crate::{api::types::{Decrypt, DecryptRequest, E, G1, G2}, setup::PublicKey};
+use crate::api::types::{Decrypt, DecryptRequest, G1, G2};
+// use crate::{api::types::E, setup::PublicKey};
 
 impl DecryptRequest {
     pub fn deserialize(self) -> Option<Decrypt> { 
@@ -22,22 +23,6 @@ impl DecryptRequest {
             return None;
         }
         let sa2: [G2; 6] = tmp_sa2.unwrap();
-
-        // println!("{:?}", proto.pks);
-        let mut pks = Vec::new();
-        for (idx, pk) in self.pks.iter().enumerate() {
-            if pk.is_empty() {
-                log::error!("pk is empty /decrypt: {}", idx);
-                continue;
-            }
-            let cur = Cursor::new(pk);
-            let tmp_pk = PublicKey::<E>::deserialize_uncompressed_unchecked(cur);
-            if tmp_pk.is_err() {
-                log::error!("can't deserialize pk {}", idx);
-                return None;
-            }
-            pks.push(tmp_pk.unwrap());
-        }
 
         let mut parts = HashMap::new();
         for part in self.parts {
@@ -61,7 +46,7 @@ impl DecryptRequest {
         Option::from(
             Decrypt {
                 enc: self.enc,
-                pks,
+                /* pks, */
                 parts,
                 gamma_g2,
                 sa1,

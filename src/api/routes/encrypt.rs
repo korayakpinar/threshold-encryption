@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use std::io::Cursor;
 use std::time;
 
@@ -50,49 +51,9 @@ pub async fn encrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
     }
     let encrypt_data = encrypt_data_res.unwrap();
 
-    let mut pks = encrypt_data.pks;
+    let ct = encrypt(&datum.aggregated, encrypt_data.t, &kzg_setup);
 
-    let log2_n = log2(encrypt_data.n) as usize - 1;
-    let req = Poly { log2_n, idx: 0 };
-    
-    let mut wr = Vec::new();
-    let serialize_result = req.serialize_compressed(&mut wr);
-    if serialize_result.is_err() {
-        unsafe { libc::malloc_trim(0); }
-        log::error!("can't serialize data!");
-        return HttpResponse::InternalServerError().finish();
-    }
-    
     let mut rng = OsRng;
-    let mut sk_zero: SecretKey<E> = SecretKey::new(&mut rng);
-    sk_zero.nullify();
-
-    let client = &datum.client;
-    let resp = client.post(&datum.mempool).body(wr).send().await;
-    if resp.is_err() {
-        unsafe { libc::malloc_trim(0); }
-        log::error!("can't reach internal api!");
-        return HttpResponse::InternalServerError().finish();
-    }
-    let bytes = resp.unwrap().bytes().await;
-    if bytes.is_err() {
-        unsafe { libc::malloc_trim(0); }
-        log::error!("can't read bytes from internal api response!");
-        return HttpResponse::InternalServerError().finish();
-    }
-    let cur = Cursor::new(bytes.unwrap());
-    let lagrange_poly = LagrangePoly::deserialize_compressed(cur);
-    if lagrange_poly.is_err() {
-        unsafe { libc::malloc_trim(0); }
-        log::error!("can't deserialize bytes from internal api response!");
-        return HttpResponse::InternalServerError().finish();
-    }
-
-    pks.insert(0, get_pk_exp(&sk_zero, 0, &lagrange_poly.unwrap()));
-
-    let aggregated = AggregateKey::<E>::new(pks.clone(), pks.len(), &kzg_setup);
-    let ct = encrypt(&aggregated, encrypt_data.t, &kzg_setup);
-
     let mut hasher = Sha256::new();
     hasher.update(ct.enc_key.to_string().as_bytes());
     let result = hasher.clone().finalize();
@@ -114,10 +75,10 @@ pub async fn encrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
     hasher.update(ct.enc_key.to_string().as_bytes());
 
     drop(hasher);
-    drop(aggregated);
-    drop(sk_zero);
+    /* drop(aggregated);
+    drop(sk_zero); */
     drop(encrypt_data.msg);
-    drop(req);
+    /* drop(req); */
 
     let resp = HttpResponse::Ok().protobuf(EncryptResponse::new(enc, ct, iv.to_vec()));
     if resp.is_err() {

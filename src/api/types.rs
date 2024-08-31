@@ -10,7 +10,7 @@ use block_modes::block_padding::Pkcs7;
 
 use crate::encryption::Ciphertext;
 use crate::kzg::UniversalParams;
-use crate::setup::{PublicKey, SecretKey};
+use crate::setup::{AggregateKey, PublicKey, SecretKey};
 
 use prost::{self, Message};
 
@@ -22,11 +22,13 @@ pub type Aes256Cbc = Cbc<Aes256, Pkcs7>;
 #[derive(Clone)]
 pub struct Data {
     pub kzg_setup: UniversalParams<E>,
+    pub aggregated: AggregateKey<E>,
     pub client: reqwest::Client,
-    pub mempool: String
+    pub mempool: String,
 }
 
 // Poly
+
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct Poly {
     pub log2_n: usize,
@@ -73,7 +75,7 @@ pub struct VerifyPartRequest {
 #[derive(Clone)]
 pub struct Encrypt {
     pub msg: Vec<u8>,
-    pub pks: Vec<PublicKey<E>>,
+    /* pub pks: Vec<PublicKey<E>>, */
     pub t: usize,
     pub n: usize
 }
@@ -82,11 +84,9 @@ pub struct Encrypt {
 pub struct EncryptRequest {
     #[prost(bytes, tag="1")]
     pub msg: Vec<u8>,
-    #[prost(bytes, repeated, tag="2")]
-    pub pks: Vec<Vec<u8>>,
-    #[prost(uint64, tag="3")]
+    #[prost(uint64, tag="2")]
     pub t: u64,
-    #[prost(uint64, tag="4")]
+    #[prost(uint64, tag="3")]
     pub n: u64
 }
 
@@ -140,7 +140,7 @@ impl EncryptResponse {
 #[derive(Clone)]
 pub struct Decrypt {
     pub enc: Vec<u8>,
-    pub pks: Vec<PublicKey<E>>,
+    /* pub pks: Vec<PublicKey<E>>, */
     pub parts: HashMap<usize, G2>,
     pub gamma_g2: G2,
     pub sa1: [G1; 2],
@@ -154,21 +154,19 @@ pub struct Decrypt {
 pub struct DecryptRequest {
     #[prost(bytes, tag="1")]
     pub enc: Vec<u8>,
-    #[prost(bytes, repeated, tag="2")]
-    pub pks: Vec<Vec<u8>>,
-    #[prost(map = "uint64, bytes", tag="3")]
+    #[prost(map = "uint64, bytes", tag="2")]
     pub parts: HashMap<u64, Vec<u8>>,
-    #[prost(bytes, tag="4")]
+    #[prost(bytes, tag="3")]
     pub gamma_g2: Vec<u8>,
-    #[prost(bytes, tag="5")]
+    #[prost(bytes, tag="4")]
     pub sa1: Vec<u8>,
-    #[prost(bytes, tag="6")]
+    #[prost(bytes, tag="5")]
     pub sa2: Vec<u8>,
-    #[prost(bytes, tag="7")]
+    #[prost(bytes, tag="6")]
     pub iv: Vec<u8>,
-    #[prost(uint64, tag="8")]
+    #[prost(uint64, tag="7")]
     pub t: u64,
-    #[prost(uint64, tag="9")]
+    #[prost(uint64, tag="8")]
     pub n: u64
 }
 
