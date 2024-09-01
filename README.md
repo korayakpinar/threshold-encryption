@@ -19,7 +19,6 @@ Use ```cargo run --example endtoend``` to check correctness of the implementatio
 **Request Parameters:**
 
 - `enc` (bytes): Encrypted data.
-- `pks` (repeated bytes): Public keys.
 - `parts` (map<uint64, bytes>): Decryption parts.
 - `gamma_g2` (bytes): Gamma value in G2.
 - `sa1` (bytes): SA1 value.
@@ -48,7 +47,6 @@ Use ```cargo run --example endtoend``` to check correctness of the implementatio
 **Request Parameters:**
 
 - `msg` (bytes): Message to be encrypted.
-- `pks` (repeated bytes): Public keys.
 - `t` (uint64): Threshold.
 - `n` (uint64): Total number of participants.
 
