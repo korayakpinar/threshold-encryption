@@ -99,6 +99,12 @@ async fn main() {
     }
 
     let agg_key = AggregateKey::<E>::new(pk.clone(), n, &params);
+
+    let mut serialized = Vec::new();
+    agg_key.serialize_compressed(&mut serialized).unwrap();
+
+    println!("{:?}", hex::encode(serialized));
+
     let ct = encrypt::<E>(&agg_key, t, &params);
 
     // compute partial decryptions
