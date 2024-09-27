@@ -298,7 +298,7 @@ impl LagrangePolyHelper {
             tasks.push(li_by_tau_task);
 
             // let c = sk.clone();
-            for j in 0..n {
+            for j in id..n {
                 if j == id {
                     let li_by_z_task = tokio::spawn(async move {
                         let li = &get_lagrange_polys()[id];
@@ -353,18 +353,26 @@ impl LagrangePolyHelper {
             println!("tasks: {} - {:#?}", idx, t.elapsed());
         }
 
-        let mut li_by_z_times_li = Vec::new();
-        let mut tmp = Vec::new();
-        for (idx, task) in li_by_z_times_li_tasks.into_iter().enumerate() {
-            let t = time::Instant::now();
-            if idx % n == 0 && idx != 0 {
-                li_by_z_times_li.push(tmp.to_owned());
-                tmp.clear()
-            }
-            tmp.push(task.await.unwrap());
-            println!("tasks_z: {} - {:#?}", idx, t.elapsed());
+        let mut resolved: Vec<G1> = Vec::new();
+        for task in li_by_z_times_li_tasks {
+            resolved.push(task.await.unwrap());
         }
-        li_by_z_times_li.push(tmp.to_owned());
+
+        let mut li_by_z_times_li: Vec<Vec<G1>> = vec![vec![G1::zero(); n]; n];
+
+        let mut resolved_index = 0;
+
+        for i in 0..n {
+            for j in i..n {
+                li_by_z_times_li[i][j] = resolved[resolved_index];
+                if j != i {
+                    li_by_z_times_li[j][i] = resolved[resolved_index];
+                }
+
+                resolved_index += 1;
+            }
+        }
+
         ret.li_by_z = li_by_z_times_li;
         
         ret
