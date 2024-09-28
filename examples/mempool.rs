@@ -3,7 +3,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use clap::{arg, Parser};
 use rocket::{data::{Limits, ToByteUnit}, post, routes, Config, State};
 use rocket::http::Status;
-use silent_threshold::{api::types::Poly, utils::{IsValidHelper, IsValidPoly, LagrangePoly, LagrangePolyHelper}};
+use silent_threshold::{api::types::Poly, utils::{malloc_trim, IsValidHelper, IsValidPoly, LagrangePoly, LagrangePolyHelper}};
 use tokio::io::AsyncReadExt;
 
 #[derive(Parser, Debug)]
@@ -30,11 +30,11 @@ struct Polys {
 
 #[post("/poly", data = "<bytes>")]
 async fn poly_route(state: &State<Polys>, bytes: rocket::data::Data<'_>) -> Result<Vec<u8>, Status> {
-    unsafe { libc::malloc_trim(0); }
+    unsafe { malloc_trim(0); }
 
     let mut buf = Vec::new();
     if let Err(_) = bytes.open(1.kilobytes()).read_to_end(&mut buf).await {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         return Err(Status::InternalServerError);
     }
 
@@ -42,7 +42,7 @@ async fn poly_route(state: &State<Polys>, bytes: rocket::data::Data<'_>) -> Resu
     let poly = match Poly::deserialize_compressed(cur) {
         Ok(p) => p,
         Err(_) => {
-            unsafe { libc::malloc_trim(0); };
+            unsafe { malloc_trim(0); };
             return Err(Status::BadRequest)
         },
     };
@@ -52,21 +52,21 @@ async fn poly_route(state: &State<Polys>, bytes: rocket::data::Data<'_>) -> Resu
 
     let mut result = Vec::new();
     if res.serialize_compressed(&mut result).is_err() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         return Err(Status::InternalServerError);
     }
 
-    unsafe { libc::malloc_trim(0); }
+    unsafe { malloc_trim(0); }
     Ok(result)
 }
 
 #[post("/polyvalid", data = "<bytes>")]
 async fn polyvalid_route(state: &State<Polys>, bytes: rocket::data::Data<'_>) -> Result<Vec<u8>, Status> {
-    unsafe { libc::malloc_trim(0); }
+    unsafe { malloc_trim(0); }
 
     let mut buf = Vec::new();
     if let Err(_) = bytes.open(1.kilobytes()).read_to_end(&mut buf).await {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         return Err(Status::InternalServerError);
     }
 
@@ -74,7 +74,7 @@ async fn polyvalid_route(state: &State<Polys>, bytes: rocket::data::Data<'_>) ->
     let poly = match Poly::deserialize_compressed(cur) {
         Ok(p) => p,
         Err(_) => {
-            unsafe { libc::malloc_trim(0); };
+            unsafe { malloc_trim(0); };
             return Err(Status::BadRequest)
         },
     };
@@ -84,11 +84,11 @@ async fn polyvalid_route(state: &State<Polys>, bytes: rocket::data::Data<'_>) ->
 
     let mut result = Vec::new();
     if res.serialize_compressed(&mut result).is_err() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         return Err(Status::InternalServerError);
     }
 
-    unsafe { libc::malloc_trim(0); }
+    unsafe { malloc_trim(0); }
     Ok(result)
 }
 

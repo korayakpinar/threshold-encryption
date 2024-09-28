@@ -9,6 +9,7 @@ use std::ops::{Mul, Sub};
 use crate::api::types::E as Q;
 use crate::utils::LagrangePoly;
 use crate::kzg::{UniversalParams, KZG10};
+use rayon::prelude::*;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct SecretKey<E: Pairing> {
@@ -185,20 +186,19 @@ impl<E: Pairing> AggregateKey<E> {
         let h_minus1 = params.powers_of_h[0] * (-E::ScalarField::one());
         let z_g2 = params.powers_of_h[n] + h_minus1;
 
-        // gather sk_li from all public keys
-        let mut ask = E::G1::zero();
-        for pki in pk.iter() {
-            ask += pki.sk_li;
-        }
+        // Gather sk_li from all public keys using parallel iteration
+        let ask = pk.par_iter()
+            .map(|pki| pki.sk_li)
+            .reduce(E::G1::zero, |a, b| a + b);
 
-        let mut agg_sk_li_by_z = vec![];
-        for i in 0..n {
-            let mut agg_sk_li_by_zi = E::G1::zero();
-            for pkj in pk.iter() {
-                agg_sk_li_by_zi += pkj.sk_li_by_z[i];
-            }
-            agg_sk_li_by_z.push(agg_sk_li_by_zi);
-        }
+        // Aggregate sk_li_by_z using parallel iteration
+        let agg_sk_li_by_z: Vec<E::G1> = (0..n).into_par_iter()
+            .map(|i| {
+                pk.par_iter()
+                    .map(|pkj| pkj.sk_li_by_z[i])
+                    .reduce(E::G1::zero, |a, b| a + b)
+            })
+            .collect();
 
         AggregateKey {
             pk,

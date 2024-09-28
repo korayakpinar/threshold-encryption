@@ -2,14 +2,14 @@ use actix_protobuf::{ProtoBuf, ProtoBufResponseBuilder};
 use actix_web::{HttpRequest, HttpResponse};
 use ark_serialize::CanonicalSerialize;
 
-use crate::api::types::*;
+use crate::{api::types::*, utils::malloc_trim};
 
 pub async fn decrypt_part_route(_: HttpRequest, data: ProtoBuf<PartDecRequest>) -> HttpResponse {
-    unsafe { libc::malloc_trim(0); }
+    unsafe {  malloc_trim(0); }
 
     let decrypt_part_res = data.0.deserialize();
     if decrypt_part_res.is_none() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe {  malloc_trim(0); }
         log::error!("can't deserialize gamma_g2");
         return HttpResponse::BadRequest().finish();
     }
@@ -23,7 +23,7 @@ pub async fn decrypt_part_route(_: HttpRequest, data: ProtoBuf<PartDecRequest>) 
     let mut result = Vec::new();
     let res = val.serialize_uncompressed(&mut result);
     if res.is_err() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe {  malloc_trim(0); }
         log::error!("can't serialize gamma_g2 * sk");
         return HttpResponse::BadRequest().finish();
     }
@@ -32,10 +32,10 @@ pub async fn decrypt_part_route(_: HttpRequest, data: ProtoBuf<PartDecRequest>) 
 
     let resp = HttpResponse::Ok().protobuf(Response { result });
     if resp.is_err() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe {  malloc_trim(0); }
         log::error!("can't cast the result to ResultProto");
         return HttpResponse::InternalServerError().finish();
     }
-    unsafe { libc::malloc_trim(0); }
+    unsafe {  malloc_trim(0); }
     resp.unwrap()
 }

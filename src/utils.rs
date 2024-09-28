@@ -8,7 +8,24 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::Zero;
 use std::{ops::{Mul, Sub}, sync::Once, time};
 
+use libc::{self, malloc_zone_t};
 use crate::{api::types::{E, G1, G2}, kzg::{UniversalParams, KZG10}, setup::SecretKey};
+
+#[cfg(target_os = "macos")]
+extern "C" {
+    fn malloc_zone_pressure_relief(zone: *mut malloc_zone_t, goal: usize);
+}
+
+#[cfg(target_os = "macos")]
+pub unsafe fn malloc_trim(n: usize) {
+    let zone = libc::malloc_default_zone();
+    malloc_zone_pressure_relief(zone, n);
+} 
+
+#[cfg(target_os = "linux")]
+pub unsafe fn malloc_trim(n: usize) {
+    libc::malloc_trim(n);
+} 
 
 // 1 at omega^i and 0 elsewhere on domain {omega^i}_{i \in [n]}
 pub fn lagrange_poly<F: FftField>(n: usize, i: usize) -> DensePolynomial<F> {

@@ -9,7 +9,7 @@ use ark_ec::pairing::Pairing;
 use ark_std::Zero;
 use rand::rngs::OsRng;
 use silent_threshold::{
-    decryption::agg_dec, encryption::encrypt, kzg::UniversalParams, setup::{get_pk_exp, AggregateKey, PublicKey, SecretKey}, utils::{LagrangePoly, LagrangePolyHelper}
+    api::types::G1, decryption::agg_dec, encryption::encrypt, kzg::UniversalParams, setup::{get_pk_exp, AggregateKey, PublicKey, SecretKey}, utils::{LagrangePoly, LagrangePolyHelper}
 };
 
 type E = Bls12_381;
@@ -98,14 +98,18 @@ async fn main() {
         println!("{}: {:#?}", i, ti.elapsed());
     }
 
+    let ti = time::Instant::now();
     let agg_key = AggregateKey::<E>::new(pk.clone(), n, &params);
+    println!("{:#?}: elapsed time for aggregation", ti.elapsed());
 
-    let mut serialized = Vec::new();
-    agg_key.serialize_compressed(&mut serialized).unwrap();
+    // let mut serialized = Vec::new();
+    // agg_key.serialize_compressed(&mut serialized).unwrap();
 
-    println!("{:?}", hex::encode(serialized));
+    // println!("{:?}", hex::encode(serialized));
 
+    let ti = time::Instant::now();
     let ct = encrypt::<E>(&agg_key, t, &params);
+    println!("{:#?}: elapsed time for encryption", ti.elapsed());
 
     // compute partial decryptions
     let mut partial_decryptions: Vec<G2> = Vec::new();

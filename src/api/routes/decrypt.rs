@@ -17,15 +17,15 @@ use crate::setup::{get_pk_exp, AggregateKey, SecretKey};
 use crate::decryption::agg_dec;
 
 use crate::api::types::*;
-use crate::utils::LagrangePoly;
+use crate::utils::{malloc_trim, LagrangePoly};
 
 pub async fn decrypt_route(config: HttpRequest, data: web::Payload) -> HttpResponse {
-    unsafe { libc::malloc_trim(0); }
+    unsafe { malloc_trim(0); }
 
     let ti = time::Instant::now();
     let bytes_tmp = data.to_bytes().await;
     if bytes_tmp.is_err() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         log::error!("can't read bytes");
         return HttpResponse::BadRequest().finish();
     }
@@ -34,7 +34,7 @@ pub async fn decrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
 
     let data_tmp = DecryptRequest::decode(bytes);
     if data_tmp.is_err() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         log::error!("can't decode bytes to decrypt request");
         return HttpResponse::BadRequest().finish();
     }
@@ -45,7 +45,7 @@ pub async fn decrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
 
     let params_res = data.deserialize();
     if params_res.is_none() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         log::error!("can't deserialize decrypt params");
         return HttpResponse::BadRequest().finish();
     }
@@ -82,7 +82,7 @@ pub async fn decrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
 
     let cipher_dec_res = Aes256Cbc::new_from_slices(&key, &params.iv);
     if cipher_dec_res.is_err() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         log::error!("key or params.decrypt.iv is wrong");
         return HttpResponse::BadRequest().finish();
     }
@@ -90,7 +90,7 @@ pub async fn decrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
 
     let decrypted_res = cipher_dec.decrypt_vec(&params.enc);
     if decrypted_res.is_err() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         log::error!("failed to decrypt the data, {}", decrypted_res.err().unwrap());
         return HttpResponse::UnavailableForLegalReasons().finish();
     }
@@ -105,11 +105,11 @@ pub async fn decrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
 
     let resp = HttpResponse::Ok().protobuf(Response { result });
     if resp.is_err() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         log::error!("can't cast the result to ResultProto");
         return HttpResponse::InternalServerError().finish();
     }
     log::info!("elapsed on decrypt: {:#?}", ti.elapsed());
-    unsafe { libc::malloc_trim(0); }
+    unsafe { malloc_trim(0); }
     resp.unwrap()
 }

@@ -17,15 +17,15 @@ use crate::encryption::encrypt;
 use crate::setup::{get_pk_exp, AggregateKey, SecretKey};
 
 use crate::api::types::*;
-use crate::utils::LagrangePoly;
+use crate::utils::{malloc_trim, LagrangePoly};
 
 pub async fn encrypt_route(config: HttpRequest, data: web::Payload) -> HttpResponse {
-    unsafe { libc::malloc_trim(0); }
+    unsafe { malloc_trim(0); }
 
     let ti = time::Instant::now();
     let bytes_tmp = data.to_bytes().await;
     if bytes_tmp.is_err() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         log::error!("can't read bytes");
         return HttpResponse::BadRequest().finish();
     }
@@ -34,7 +34,7 @@ pub async fn encrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
 
     let data_tmp = EncryptRequest::decode(bytes);
     if data_tmp.is_err() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         log::error!("can't decode bytes to encrypt request");
         return HttpResponse::BadRequest().finish();
     }
@@ -45,7 +45,7 @@ pub async fn encrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
 
     let encrypt_data_res = data.deserialize();
     if encrypt_data_res.is_none() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         log::error!("can't deserialize encrypt_data");
         return HttpResponse::BadRequest().finish();
     }
@@ -65,7 +65,7 @@ pub async fn encrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
 
     let cipher_enc_res = Aes256Cbc::new_from_slices(key, iv);
     if cipher_enc_res.is_err() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         log::error!("can't create Aes256Cbc::new_from_slices(key, iv)");
         HttpResponse::BadRequest().finish();
     }
@@ -82,11 +82,11 @@ pub async fn encrypt_route(config: HttpRequest, data: web::Payload) -> HttpRespo
 
     let resp = HttpResponse::Ok().protobuf(EncryptResponse::new(enc, ct, iv.to_vec()));
     if resp.is_err() {
-        unsafe { libc::malloc_trim(0); }
+        unsafe { malloc_trim(0); }
         log::error!("can't cast the result to ResultProto");
         return HttpResponse::InternalServerError().finish();
     }
     log::info!("elapsed on encrypt: {:#?}", ti.elapsed());
-    unsafe { libc::malloc_trim(0); }
+    unsafe { malloc_trim(0); }
     resp.unwrap()
 }
