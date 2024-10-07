@@ -24,7 +24,9 @@ pub async fn agg_dec<E: Pairing>(
     params: &UniversalParams<E>,
 ) -> PairingOutput<E> {
     let domain = Radix2EvaluationDomain::<E::ScalarField>::new(n).unwrap();
+    // println!("domain: {:#?}", domain);
     let domain_elements: Vec<E::ScalarField> = domain.elements().collect();
+    // println!("domain_elements: {:#?}", domain_elements);
     // points is where B is set to zero
     // parties is the set of parties who have signed
     let mut points = vec![domain_elements[0]]; // 0 is the dummy party that is always true
@@ -37,8 +39,11 @@ pub async fn agg_dec<E: Pairing>(
         }
     }
 
+    // println!("points: {:#?}", points);
     let b = interp_mostly_zero(E::ScalarField::one(), &points);
+    // println!("b: {:#?}", b);
     let b_evals = domain.fft(&b.coeffs);
+    // println!("b_evals: {:#?}", b_evals);
 
     debug_assert!(b.degree() == points.len() - 1);
     debug_assert!(b.evaluate(&domain_elements[0]) == E::ScalarField::one());
