@@ -80,7 +80,7 @@ async fn main() -> std::io::Result<()> {
             pks.push(pk);
         }
 
-        let log2_n = log2(pks.len()) as usize - 1;
+        let log2_n = log2(args.committee_size) as usize - 1;
         let req = Poly { log2_n, idx: 0 };
 
         let mut wr = Vec::new();
