@@ -15,7 +15,6 @@ use silent_threshold::{
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use reqwest::Client;
 use ethers::prelude::*;
-
 use transaction::eip2718::TypedTransaction;
 
 type E = Bls12_381;
@@ -24,7 +23,7 @@ type E = Bls12_381;
 const N: usize = 512;
 const K: usize = 511;
 const T: usize = 2;
-const URL: &str = "https://banger.build:8545"; //"https://ethereum-holesky-rpc.publicnode.com"; //
+const URL: &str = "https://eldergleam.legendrelabs.xyz:8545"; //"https://ethereum-holesky-rpc.publicnode.com"; //
 const ETH_VALUE: f64 = 0.000001 * 1e18;
 const FROM: &str = "4562d7fdf20d2661b8b7e174d3a63458830c8161006d2749ea3022a796507c8e";
 const TO: &str = "0x587EC4234B450310a9B64984b523CC1D077112f8";
@@ -62,26 +61,17 @@ pub struct EncryptedTransactionParams {
     pub iv: Vec<u8>,
 }
 
-fn encrypt_transaction(plaintext: &[u8], n: usize, k: usize, t: usize) -> EncryptedTransactionParams {
+fn encrypt_transaction_with_preloaded(
+    plaintext: &[u8],
+    agg_key: &AggregateKey<E>,
+    params: &UniversalParams<E>,
+    t: usize,
+) -> EncryptedTransactionParams {
     let mut rng = OsRng;
 
-    // Load necessary files and initialize parameters
-    println!("Loading lagrange helper");
-    let lagrange_helper = load_lagrange_helper(n);
-    println!("Lagrange helper loaded\n");
-    println!("Loading universal params");
-    let params = load_universal_params();
-    println!("Universal params loaded\n");
-
-    // Generate keys
-    println!("Generating keys");
-    let (_sk, pk) = generate_keys(k, &lagrange_helper);
-    println!("Keys generated\n");
-    println!("Aggregating keys");
-    let agg_key = AggregateKey::<E>::new(pk.clone(), n, &params);
-    println!("Keys aggregated\n");
+    // Encrypt the transaction
     println!("Encrypting transaction");
-    let ct = encrypt::<E>(&agg_key, t, &params);
+    let ct = encrypt::<E>(agg_key, t, params);
     println!("Transaction encrypted\n");
     let mut hasher = Sha256::new();
     hasher.update(ct.enc_key.to_string().as_bytes());
@@ -106,7 +96,7 @@ fn encrypt_transaction(plaintext: &[u8], n: usize, k: usize, t: usize) -> Encryp
     EncryptedTransactionParams {
         hash: "".to_string(), // This will be filled later with the transaction hash
         encrypted_tx: enc,
-        pk_ids: (0..n as u64 - 1).collect(),
+        pk_ids: (0..N as u64 - 1).collect(),
         gamma_g2,
         threshold: t as u64,
         sa1,
@@ -120,7 +110,7 @@ fn load_lagrange_helper(n: usize) -> LagrangePolyHelper {
     let mut contents = Vec::new();
     file.read_to_end(&mut contents).unwrap();
     let cur = Cursor::new(contents);
-    LagrangePolyHelper::deserialize_compressed(cur).unwrap()
+    LagrangePolyHelper::deserialize_compressed_unchecked(cur).unwrap()
 }
 
 fn load_universal_params() -> UniversalParams<E> {
@@ -128,7 +118,7 @@ fn load_universal_params() -> UniversalParams<E> {
     let mut contents = Vec::new();
     file.read_to_end(&mut contents).unwrap();
     let cur = Cursor::new(contents);
-    UniversalParams::deserialize_compressed(cur).unwrap()
+    UniversalParams::deserialize_compressed_unchecked(cur).unwrap()
 }
 
 fn generate_keys(k: usize, lagrange_helper: &LagrangePolyHelper) -> (Vec<SecretKey<E>>, Vec<PublicKey<E>>) {
@@ -155,78 +145,126 @@ fn generate_keys(k: usize, lagrange_helper: &LagrangePolyHelper) -> (Vec<SecretK
         let mut contents = Vec::new();
         file.read_to_end(&mut contents).unwrap();
         let cur = Cursor::new(contents);
-        let key = SecretKey::<E>::deserialize_compressed(cur).unwrap();
+        let key = SecretKey::<E>::deserialize_compressed_unchecked(cur).unwrap();
         sk.push(key);
     }
 
     (sk, pk)
 }
 
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let wallet: LocalWallet = FROM.parse()?;
+    // Load necessary files and initialize parameters once
+    println!("Loading lagrange helper");
+    let lagrange_helper = load_lagrange_helper(N);
+    println!("Lagrange helper loaded\n");
+    println!("Loading universal params");
+    let params = load_universal_params();
+    println!("Universal params loaded\n");
 
+    // Generate keys once
+    println!("Generating keys");
+    let (_sk, pk) = generate_keys(K + 1, &lagrange_helper);
+    println!("Keys generated\n");
+
+    // Create the aggregate key once
+    println!("Aggregating keys");
+    let agg_key = AggregateKey::<E>::new(pk.clone(), N, &params);
+    println!("Keys aggregated\n");
+
+    // Initialize the wallet and client
+    let wallet: LocalWallet = FROM.parse()?;
     println!("Wallet: {:?}", wallet);
-    
-    let to_address: Address = TO.parse()?; 
-    let value:U256 = U256::from(ETH_VALUE as u64);
     let provider = Provider::<Http>::try_from(URL)?;
     let client = SignerMiddleware::new(provider, wallet.with_chain_id(17000u64));
-    let nonce = client.get_transaction_count(client.address().clone(), Some(BlockNumber::Pending.into())).await?;
-    let tx = TransactionRequest::new().to(to_address).value(value).data(DATA.as_bytes().to_vec()).from(client.address()).chain_id(17000u64).gas(22000u64).nonce(nonce);
-   
-    let mut typed_tx: TypedTransaction = tx.into();
-    let gas_price = client.get_gas_price().await?;
-    let gas = client.estimate_gas(&typed_tx.clone(), None).await?;
 
-    typed_tx.set_gas_price(gas_price).set_gas(gas);
+    // Prepare common transaction parameters
+    let to_address: Address = TO.parse()?; 
+    let value: U256 = U256::from(ETH_VALUE as u64);
+    let chain_id = 17000u64;
 
-    let sig = client.sign_transaction(&typed_tx, client.address()).await?;
-    let signed_tx = typed_tx.rlp_signed(&sig);
-    
-    let hash = typed_tx.hash(&sig);
-    println!("{:?}", signed_tx);
-    let mut params = encrypt_transaction(&signed_tx.0, N, K + 1, T);
-    params.hash = format!("{:?}", hash);
+    // Determine the number of transactions you want to send
+    let num_transactions = 32; // For example, send 5 transactions
 
-    
-    println!("Hash: {:?}", params.hash);
-    println!("Encrypted tx: {:?}", params.encrypted_tx);
-    println!("PK ids: {:?}", params.pk_ids.len());
-    println!("Gamma G2: {:?}", params.gamma_g2.len());
-    println!("Threshold: {:?}", params.threshold);
-    println!("SA1: {:?}", params.sa1.len());
-    println!("SA2: {:?}", params.sa2.len());
-    println!("IV: {:?}", params.iv);
-     
-  
-    let request = EncryptedTransactionRequest {
-        id: 1,
-        jsonrpc: "2.0".to_string(),
-        method: "eth_sendEncryptedTransaction".to_string(),
-        params: vec![params],
-    };
+    // Get the current nonce for each transaction
+    let mut nonce = client.get_transaction_count(client.address(), Some(BlockNumber::Pending.into())).await.unwrap();
 
-    // Create a new HTTP client
-    let client = Client::new();
+    for i in 0..num_transactions {
+        // Clone necessary data for the async task
+        let client = client.clone();
+        let agg_key = agg_key.clone();
+        let params = params.clone();
+        let to_address = to_address.clone();
+        let value = value.clone();
 
-    // Send the POST request
-    let response = client.post(URL)
-        .header("Content-Type", "application/json")
-        .json(&request)
-        .send()
-        .await?;
+        // Spawn a new task for each transaction
+        println!("Processing transaction {}", i + 1);
 
-    // Check if the request was successful
-    if response.status().is_success() {
-        let response_body = response.text().await?;
-        println!("Successfully sent encrypted transaction. Response: {}", response_body);
-    } else {
-        println!("Failed to send encrypted transaction. Status: {}", response.status());
-        let error_body = response.text().await?;
-        println!("Error response: {}", error_body);
-    } 
+        
+        nonce += U256::from(i);
+        // Create the transaction
+        let tx = TransactionRequest::new()
+            .to(to_address)
+            .value(value)
+            .data(DATA.as_bytes().to_vec())
+            .from(client.address())
+            .chain_id(chain_id)
+            .gas(22000u64)
+            .nonce(nonce);
+
+        let mut typed_tx: TypedTransaction = tx.into();
+        let gas_price = client.get_gas_price().await.unwrap();
+        let gas = client.estimate_gas(&typed_tx.clone(), None).await.unwrap();
+
+        typed_tx.set_gas_price(gas_price).set_gas(gas);
+
+        // Sign the transaction
+        let sig = client.sign_transaction(&typed_tx, client.address()).await.unwrap();
+        let signed_tx = typed_tx.rlp_signed(&sig);
+
+        let hash = typed_tx.hash(&sig);
+        println!("Signed transaction: {:?}", signed_tx);
+
+        // Encrypt the transaction using the preloaded data
+        let mut params_enc = encrypt_transaction_with_preloaded(
+            &signed_tx.0,
+            &agg_key,
+            &params,
+            T,
+        );
+        params_enc.hash = format!("{:?}", hash);
+
+        // Prepare the request
+        let request = EncryptedTransactionRequest {
+            id: 1,
+            jsonrpc: "2.0".to_string(),
+            method: "eth_sendEncryptedTransaction".to_string(),
+            params: vec![params_enc],
+        };
+
+        // Create a new HTTP client
+        let http_client = Client::new();
+
+        // Send the POST request
+        let response = http_client.post(URL)
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await.unwrap();
+
+        // Check if the request was successful
+        if response.status().is_success() {
+            let response_body = response.text().await.unwrap();
+            println!("Successfully sent encrypted transaction {}. Response: {}", i + 1, response_body);
+        } else {
+            println!("Failed to send encrypted transaction {}. Status: {}", i + 1, response.status());
+            let error_body = response.text().await.unwrap();
+            println!("Error response: {}", error_body);
+        } 
+
+        println!("Transaction {} processed", i + 1);
+        
+    }
 
     Ok(())
 }
